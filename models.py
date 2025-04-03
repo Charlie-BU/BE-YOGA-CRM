@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import create_engine, ForeignKey, Boolean, Column, Integer, String, CLOB, CLOB, DateTime, Date, Float
+from sqlalchemy import create_engine, ForeignKey, Boolean, Column, Integer, String, Text, DateTime, Date, Float
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy.ext.mutable import MutableList
 from bcrypt import hashpw, gensalt, checkpw
@@ -25,16 +25,23 @@ session = Session()
 class User(Base):
     __tablename__ = "user"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(CLOB, nullable=True)
-    hashedPassword = Column(CLOB, nullable=True)
-    # 性别：男1/女2
+    username = Column(Text, nullable=True)
+    hashedPassword = Column(Text, nullable=True)
+    # 性别：1男 / 2女
     gender = Column(Integer, nullable=True)
-    email = Column(CLOB, nullable=True)
-    phone = Column(CLOB, nullable=True)
+    phone = Column(Text, nullable=True)
+    address = Column(Text, nullable=True)
     # 用户权限级：普通用户1/普通管理员2/超级管理员6
     usertype = Column(Integer, nullable=True, default=1)
-    workNum = Column(CLOB, nullable=True)
-    avatarUrl = Column(CLOB, nullable=True)
+    workNum = Column(Text, nullable=True)
+    avatarUrl = Column(Text, nullable=True)
+    # 所在部门
+    departmentId = Column(Integer, ForeignKey("department.id"), nullable=True)
+    department = relationship("Department", backref="users")
+    # 职位：1总经理 / 2店长 / 3总监 / 4校长 / 5咨询 / 6老师 / 7助理 / 8员工 / 9新媒体
+    vocation = Column(Integer, nullable=True)
+    # 人员状态：1在职 / 2离职
+    status = Column(Integer, nullable=True)
 
     @staticmethod  # 静态方法归属于类的命名空间，同时能够在不依赖类的实例的情况下调用
     def hashPassword(password):
@@ -49,18 +56,118 @@ class User(Base):
             "id": self.id,
             "username": self.username,
             "gender": self.gender,
-            "email": self.email,
             "phone": self.phone,
+            "address": self.address,
             "usertype": self.usertype,
             "workNum": self.workNum,
             "avatarUrl": self.avatarUrl,
+            "departmentId": self.departmentId,
+            "vocation": self.vocation,
+            "status": self.status,
         }
+        if self.departmentId:
+            data["departmentName"] = self.department.name,
+        return data
+
+
+class Department(Base):
+    __tablename__ = "department"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=True)
+    phone = Column(Text, nullable=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "phone": self.phone,
+        }
+        return data
+
+
+class Client(Base):
+    __tablename__ = "client"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=True)
+    #  * 渠道来源：
+    #  * 1传统 - 竞价商务通 / 2传统 - 电话 / 3传统 - 推荐 / 4传统 - 进店 / 5传统 - 优化站 /
+    #  * 6新电 - 美团 / 7新电 - 点评 / 8新电 - 小红书 / 9新电 - 抖音 / 10新电 - 红推 /
+    #  * 11新电 - 公众号 / 12新电 - 视频号 / 13新电 - 快手 / 14新电 - 抖音信息流 / 15新电 - 其他 /
+    #  * 16新电 - 北京信息流 / 17新电 - 上海信息流 / 18新电 - 成都信息流 / 19新电 - 广州信息流 /
+    #  * 20新电 - 成都红推 / 21新电 - 高德 / 22新电 - 快手信息流 / 23新电 - 上海广点通 /
+    #  * 24新电 - 成都广点通 / 25新电 - 小程序 / 26新电 - 电商 / 27会员介绍 / 28合作 /
+    #  * 29其他 / 30漏登记
+    #  */
+    fromSource = Column(Integer, nullable=True)
+    gender = Column(Integer, nullable=True)
+    age = Column(Integer, nullable=True)
+    # 身份证
+    IDNumber = Column(Text, nullable=True)
+    phone = Column(Text, nullable=True)
+    weixin = Column(Text, nullable=True)
+    QQ = Column(Text, nullable=True)
+    douyin = Column(Text, nullable=True)
+    rednote = Column(Text, nullable=True)
+    shangwutong = Column(Text, nullable=True)
+    address = Column(Text, nullable=True)
+    # 状态：1未分配 / 2已分配 / 3转客户
+    clientStatus = Column(Integer, nullable=True, default=1)
+    # 所属人
+    affiliatedUserId = Column(Integer, ForeignKey("user.id"), nullable=True)
+    affiliatedUser = relationship("User", backref="clients")
+    # 创建人id
+    createdUserId = Column(Integer, nullable=True)
+    createdTime = Column(DateTime, nullable=True, default=datetime.now)
+    # 备注（公海时用）
+    info = Column(Text, nullable=True)
+    # 详细备注（客户时用）
+    detailedInfo = Column(Text, nullable=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "fromSource": self.fromSource,
+            "gender": self.gender,
+            "age": self.age,
+            "IDNumber": self.IDNumber,
+            "phone": self.phone,
+            "weixin": self.weixin,
+            "QQ": self.QQ,
+            "douyin": self.douyin,
+            "rednote": self.rednote,
+            "shangwutong": self.shangwutong,
+            "address": self.address,
+            "clientStatus": self.clientStatus,
+            "affiliatedUserId": self.affiliatedUserId,
+            "createdUserId": self.createdUserId,
+            "createdTime": self.createdTime,
+            "info": self.info,
+            "detailedInfo": self.detailedInfo
+        }
+        if self.affiliatedUserId:
+            data["affiliatedUserName"] = self.affiliatedUser.username
         return data
 
 
 class Log(Base):
     __tablename__ = "log"
     id = Column(Integer, primary_key=True, autoincrement=True)
+    operatorId = Column(Integer, ForeignKey("user.id"), nullable=False)
+    operator = relationship("User", backref="logs")
+    operation = Column(Text, nullable=True)
+    time = Column(DateTime, default=datetime.now)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "operatorId": self.operatorId,
+            "operatorName": self.operator.username,
+            "operation": self.operation,
+            "time": self.time,
+        }
+        return data
+
 
 # 创建所有表（被alembic替代）
 if __name__ == "__main__":

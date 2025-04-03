@@ -1,13 +1,17 @@
 from robyn import Robyn, ALLOW_CORS, jsonify
 
+from bluePrints.department import deptRouter
 from bluePrints.user import userRouter
 from models import User, session
 
 app = Robyn(__file__)
 ALLOW_CORS(app, origins=["*"])
+# 允许请求头携带自定义标识
+app.set_response_header("Access-Control-Allow-Headers", "*")
 
 # 注册蓝图
 app.include_router(userRouter)
+app.include_router(deptRouter)
 
 
 @app.get("/")

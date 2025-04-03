@@ -49,18 +49,18 @@ def checkSignature(signature, message):
 def checkSessionid(sessionid):
     decodedSessionid = decode(sessionid)
     if not decodedSessionid:
-        return None
+        return {}
     pattern = rf"^userId=(\d+)&timestamp=(\d+)&signature=(.+)&algorithm=sha256$"  # 必须用()包含住捕获组才能被match.group捕获
     match = re.match(pattern, decodedSessionid)
     if not match:
-        return None
+        return {}
     userId = match.group(1)
     timestamp = match.group(2)
     signature = match.group(3)
     if not checkSignature(signature, userId):  # 签名无效
-        return None
+        return {}
     if time.time() - float(timestamp) > 10800:  # 3小时有效
-        return None
+        return {}
     return {
         "userId": int(userId),
         "timestamp": timestamp
@@ -69,6 +69,8 @@ def checkSessionid(sessionid):
 
 def checkUserAuthority(userId, operationLevel="adminOnly"):
     user = session.query(User).get(userId)
+    if not user:
+        return False
     usertype = user.usertype
     if operationLevel == "adminOnly":
         return usertype == 2 or usertype == 6
