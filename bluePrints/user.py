@@ -2,7 +2,6 @@ import json
 import time
 
 from robyn import SubRouter, jsonify
-from sqlalchemy.exc import SQLAlchemyError
 
 from models import *
 from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
@@ -33,7 +32,7 @@ async def login(request):
     try:
         session.add(log)
         session.commit()
-    except SQLAlchemyError:
+    except Exception:
         session.rollback()
     return jsonify({
         "status": 200,
@@ -108,7 +107,7 @@ async def register(request):
         session.add(user)
         session.add(log)
         session.commit()
-    except SQLAlchemyError:
+    except Exception:
         session.rollback()
     return jsonify({
         "status": 200,
@@ -140,7 +139,7 @@ async def modifyPwd(request):
     try:
         session.add(log)
         session.commit()
-    except SQLAlchemyError:
+    except Exception:
         session.rollback()
     return jsonify({
         "status": 200,

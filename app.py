@@ -1,6 +1,7 @@
 from robyn import Robyn, ALLOW_CORS, jsonify
 
 from bluePrints.department import deptRouter
+from bluePrints.extra import extraRouter
 from bluePrints.user import userRouter
 from models import User, session
 
@@ -12,6 +13,7 @@ app.set_response_header("Access-Control-Allow-Headers", "*")
 # 注册蓝图
 app.include_router(userRouter)
 app.include_router(deptRouter)
+app.include_router(extraRouter)
 
 
 @app.get("/")
