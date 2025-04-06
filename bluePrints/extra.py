@@ -9,7 +9,7 @@ from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthorit
 extraRouter = SubRouter(__file__, prefix="/extra")
 
 
-# 获取线索公海（不包括已转客户）
+# 获取线索公海（不包括已转客户、已预约到店）
 @extraRouter.post("/getClueClients")
 async def getClueClients(request):
     sessionid = request.headers.get("sessionid")
@@ -25,10 +25,10 @@ async def getClueClients(request):
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
     # 获取分页数据
-    query = session.query(Client)
+    query = session.query(Client).filter(Client.clientStatus.in_([1, 2]))
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
-    clients = query.filter(Client.clientStatus != 3).offset(offset).limit(page_size).all()
+    clients = query.offset(offset).limit(page_size).all()
     clients = [Client.to_json(client) for client in clients]
     # 获取总数
     total = query.count()
@@ -40,7 +40,7 @@ async def getClueClients(request):
     })
 
 
-# 获取已转客户
+# 获取已转客户、已预约到店
 @extraRouter.post("/getClients")
 async def getClients(request):
     sessionid = request.headers.get("sessionid")
@@ -51,15 +51,17 @@ async def getClients(request):
             "message": "用户未登录"
         })
     data = request.json()
+    # 3为已转客户，4为已预约到店
+    clientStatus = data.get("clientStatus", 3)
     page_index = data.get("pageIndex", 1)  # 当前页码，默认第一页
     page_size = data.get("pageSize", 10)  # 每页数量，默认10条
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
     # 获取分页数据
-    query = session.query(Client)
+    query = session.query(Client).filter(Client.clientStatus == clientStatus)
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
-    clients = query.filter(Client.clientStatus == 3).offset(offset).limit(page_size).all()
+    clients = query.offset(offset).limit(page_size).all()
     clients = [Client.to_json(client) for client in clients]
     # 获取总数
     total = query.count()
@@ -94,6 +96,9 @@ async def updateClient(request):
                 continue
             if hasattr(client, key):
                 setattr(client, key, value)
+        log = Log(operatorId=userId,
+                  operation=f"更新客户信息：{client.name}")
+        session.add(log)
         session.commit()
         return jsonify({
             "status": 200,
@@ -131,6 +136,9 @@ async def addClient(request):
         # 创建新客户
         new_client = Client(**data)
         session.add(new_client)
+        log = Log(operatorId=userId,
+                  operation=f"创建新客户：{data['name']}")
+        session.add(log)
         session.commit()
 
         return jsonify({
@@ -171,6 +179,9 @@ async def deleteClient(request):
             })
         # 删除客户
         session.delete(client)
+        log = Log(operatorId=userId,
+                  operation=f"删除客户：{client.name}")
+        session.add(log)
         session.commit()
         return jsonify({
             "status": 200,
@@ -212,6 +223,9 @@ async def unassignClients(request):
             },
             synchronize_session=False
         )
+        log = Log(operatorId=userId,
+                  operation=f"取消分配客户：{[client.name for client in session.query(Client).filter(Client.id.in_(client_ids)).all()]}")
+        session.add(log)
         session.commit()
 
         return jsonify({
@@ -261,7 +275,9 @@ async def assignClients(request):
             "clientStatus": 2,
             "affiliatedUserId": assigned_user_id
         }, synchronize_session=False)
-
+        log = Log(operatorId=userId,
+                  operation=f"分配客户：{[client.name for client in session.query(Client).filter(Client.id.in_(client_ids)).all()]}")
+        session.add(log)
         session.commit()
         return jsonify({
             "status": 200,
@@ -272,4 +288,48 @@ async def assignClients(request):
         return jsonify({
             "status": 500,
             "message": f"分配失败：{str(e)}"
+        })
+
+
+@extraRouter.post("/submitReserve")
+async def submitReserve(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    clientId = data.get("clientId")
+    client = session.query(Client).get(clientId)
+    appointerId = data.get("appointerId")
+    appointDate = data.get("appointDate")
+    # TODO:这里有问题
+    print(appointDate)
+    courseIds = data.get("courseIds")
+    courseIds = json.loads(courseIds)
+    nextTalkDate = data.get("nextTalkDate")
+    print(nextTalkDate)
+    detailedInfo = data.get("detailedInfo")
+    client.clientStatus = 4
+    client.appointId = appointerId
+    client.appointDate = appointDate
+    client.courseIds = courseIds
+    client.nextTalkDate = nextTalkDate
+    client.detailedInfo = detailedInfo
+    try:
+        log = Log(operatorId=userId, operation=f"客户：{client.name}预约到店")
+        session.add(log)
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "预约成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"预约失败：{str(e)}"
         })

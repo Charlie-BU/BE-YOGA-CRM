@@ -116,7 +116,7 @@ class Client(Base):
     rednote = Column(Text, nullable=True)
     shangwutong = Column(Text, nullable=True)
     address = Column(Text, nullable=True)
-    # 状态：1未分配 / 2已分配 / 3转客户
+    # 状态：1未分配 / 2已分配 / 3转客户 / 4已预约到店 / 5已毕业
     clientStatus = Column(Integer, nullable=True, default=1)
     # 所属人 / 负责人 / 合作老师
     affiliatedUserId = Column(Integer, ForeignKey("user.id"), nullable=True)
@@ -131,8 +131,30 @@ class Client(Base):
 
     # 预约人
     appointerId = Column(Integer, nullable=True)
+    @property
+    def appointerName(self):
+        appointer = session.query(User).get(self.appointerId)
+        if not appointer:
+            return ""
+        return appointer.username
+    # 所在校区
+    @property
+    def schoolName(self):
+        appointer = session.query(User).get(self.appointerId)
+        if appointer and appointer.schoolId:
+            return appointer.school.name
+        else:
+            return ""
+
     # 课程（多个）
     courseIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
+    @property
+    def courseNames(self):
+        if not self.courseIds or len(self.courseIds) == 0:
+            return ""
+        courses = [session.query(Course).get(id) for id in self.courseIds]
+        courseNames = [course.name for course in courses]
+        return ", ".join(courseNames)
     # 跟进状态：1未成单 / 2已成单
     processStatus = Column(Integer, nullable=True, default=1)
     # 预约日期
@@ -164,7 +186,10 @@ class Client(Base):
             "info": self.info,
             "detailedInfo": self.detailedInfo,
             "appointerId": self.appointerId,
+            "appointerName": self.appointerName,
+            "schoolName": self.schoolName,
             "courseIds": self.courseIds,
+            "courseNames": self.courseNames,
             "processStatus": self.processStatus,
             "appointDate": self.appointDate,
             "nextTalkDate": self.nextTalkDate,
