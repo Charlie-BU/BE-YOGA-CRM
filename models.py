@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import create_engine, ForeignKey, Boolean, Column, Integer, String, Text, DateTime, Date, Float
+from sqlalchemy import create_engine, ForeignKey, Boolean, Column, Integer, String, Text, DateTime, Date, Float, JSON
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy.ext.mutable import MutableList
 from bcrypt import hashpw, gensalt, checkpw
@@ -38,6 +38,9 @@ class User(Base):
     # 所在部门
     departmentId = Column(Integer, ForeignKey("department.id"), nullable=True)
     department = relationship("Department", backref="users")
+    # 所在学校
+    schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
+    school = relationship("School", backref="users")
     # 职位：1总经理 / 2店长 / 3总监 / 4校长 / 5咨询 / 6老师 / 7助理 / 8员工 / 9新媒体
     vocation = Column(Integer, nullable=True)
     # 人员状态：1在职 / 2离职
@@ -62,11 +65,14 @@ class User(Base):
             "workNum": self.workNum,
             "avatarUrl": self.avatarUrl,
             "departmentId": self.departmentId,
+            "schoolId": self.schoolId,
             "vocation": self.vocation,
             "status": self.status,
         }
         if self.departmentId:
-            data["departmentName"] = self.department.name,
+            data["departmentName"] = self.department.name
+        if self.schoolId:
+            data["schoolName"] = self.school.name
         return data
 
 
@@ -112,16 +118,29 @@ class Client(Base):
     address = Column(Text, nullable=True)
     # 状态：1未分配 / 2已分配 / 3转客户
     clientStatus = Column(Integer, nullable=True, default=1)
-    # 所属人
+    # 所属人 / 负责人 / 合作老师
     affiliatedUserId = Column(Integer, ForeignKey("user.id"), nullable=True)
-    affiliatedUser = relationship("User", backref="clients")
+    affiliatedUser = relationship("User", backref="cooperateStudents")
     # 创建人id
     createdUserId = Column(Integer, nullable=True)
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
     # 备注（公海时用）
     info = Column(Text, nullable=True)
-    # 详细备注（客户时用）
+    # 预约备注（客户时用）
     detailedInfo = Column(Text, nullable=True)
+
+    # 预约人
+    appointerId = Column(Integer, nullable=True)
+    # 课程（多个）
+    courseIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
+    # 跟进状态：1未成单 / 2已成单
+    processStatus = Column(Integer, nullable=True, default=1)
+    # 预约日期
+    appointDate = Column(Date, nullable=True)
+    # 下次沟通日期
+    nextTalkDate = Column(Date, nullable=True)
+    # 成单时间
+    cooperateTime = Column(DateTime, nullable=True)
 
     def to_json(self):
         data = {
@@ -143,10 +162,62 @@ class Client(Base):
             "createdUserId": self.createdUserId,
             "createdTime": self.createdTime,
             "info": self.info,
-            "detailedInfo": self.detailedInfo
+            "detailedInfo": self.detailedInfo,
+            "appointerId": self.appointerId,
+            "courseIds": self.courseIds,
+            "processStatus": self.processStatus,
+            "appointDate": self.appointDate,
+            "nextTalkDate": self.nextTalkDate,
+            "cooperateTime": self.cooperateTime,
         }
         if self.affiliatedUserId:
             data["affiliatedUserName"] = self.affiliatedUser.username
+        return data
+
+
+class School(Base):
+    __tablename__ = "school"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=True)
+    info = Column(Text, nullable=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "info": self.info,
+        }
+        return data
+
+
+class Course(Base):
+    __tablename__ = "course"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=True)
+    # 分类：1瑜伽课
+    category = Column(Text, nullable=True)
+    creatorId = Column(Integer, ForeignKey("user.id"), nullable=True)
+    # 所属校区
+    schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
+    school = relationship("School", backref="courses")
+    creator = relationship("User", backref="createdCourses")
+    createdTime = Column(DateTime, nullable=True, default=datetime.now)
+    info = Column(Text, nullable=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "schoolId": self.schoolId,
+            "creatorId": self.creatorId,
+            "createdTime": self.createdTime,
+            "info": self.info,
+        }
+        if self.creatorId:
+            data["creatorName"] = self.creator.username
+        if self.schoolId:
+            data["schoolName"] = self.school.name
         return data
 
 
