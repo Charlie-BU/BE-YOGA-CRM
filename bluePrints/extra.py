@@ -306,20 +306,23 @@ async def submitReserve(request):
     client = session.query(Client).get(clientId)
     appointerId = data.get("appointerId")
     appointDate = data.get("appointDate")
-    # TODO:这里有问题
-    print(appointDate)
+    if appointDate:
+        # 日期格式处理
+        appointDate = datetime.strptime(appointDate, '%m/%d/%Y')
     courseIds = data.get("courseIds")
     courseIds = json.loads(courseIds)
     nextTalkDate = data.get("nextTalkDate")
-    print(nextTalkDate)
+    if nextTalkDate:
+        nextTalkDate = datetime.strptime(nextTalkDate, '%m/%d/%Y')
     detailedInfo = data.get("detailedInfo")
-    client.clientStatus = 4
-    client.appointId = appointerId
-    client.appointDate = appointDate
-    client.courseIds = courseIds
-    client.nextTalkDate = nextTalkDate
-    client.detailedInfo = detailedInfo
     try:
+        client.clientStatus = 4
+        client.appointerId = appointerId
+        client.appointDate = appointDate if appointDate else None
+        client.courseIds = courseIds
+        client.nextTalkDate = nextTalkDate if nextTalkDate else None
+        client.detailedInfo = detailedInfo
+        client.processStatus = 1
         log = Log(operatorId=userId, operation=f"客户：{client.name}预约到店")
         session.add(log)
         session.commit()
@@ -332,4 +335,43 @@ async def submitReserve(request):
         return jsonify({
             "status": 500,
             "message": f"预约失败：{str(e)}"
+        })
+
+
+@extraRouter.post("/cancelReserve")
+async def cancelReserve(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    clientId = data.get("clientId")
+    client = session.query(Client).get(clientId)
+
+    try:
+        # 重置预约相关字段
+        client.clientStatus = 3
+        client.appointerId = None
+        client.appointDate = None
+        client.courseIds = None
+        client.nextTalkDate = None
+        client.detailedInfo = None
+        client.processStatus = None
+        # 记录操作日志
+        log = Log(operatorId=userId, operation=f"客户：{client.name}取消预约")
+        session.add(log)
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "取消预约成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"取消预约失败：{str(e)}"
         })
