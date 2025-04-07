@@ -95,7 +95,10 @@ async def updateClient(request):
             if value == "null" or not value:
                 continue
             if hasattr(client, key):
-                setattr(client, key, value)
+                try:
+                    setattr(client, key, value)
+                except Exception:
+                    continue
         log = Log(operatorId=userId,
                   operation=f"更新客户信息：{client.name}")
         session.add(log)
@@ -291,6 +294,42 @@ async def assignClients(request):
         })
 
 
+# 转客户
+@extraRouter.post("/convertToClients")
+async def convertToClients(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    ids = data.get("ids")
+    ids = json.loads(ids)
+    try:
+        # 批量更新客户状态
+        clients = session.query(Client).filter(Client.id.in_(ids)).all()
+        for client in clients:
+            client.clientStatus = 3  # 将状态改为正式客户
+            # 记录操作日志
+            log = Log(operatorId=userId, operation=f"线索：{client.name}转为正式客户")
+            session.add(log)
+
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "转换成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"转换失败：{str(e)}"
+        })
+
+
 @extraRouter.post("/submitReserve")
 async def submitReserve(request):
     sessionid = request.headers.get("sessionid")
@@ -316,6 +355,11 @@ async def submitReserve(request):
         nextTalkDate = datetime.strptime(nextTalkDate, '%m/%d/%Y')
     detailedInfo = data.get("detailedInfo")
     try:
+        if client.clientStatus == 4:
+            return jsonify({
+                "status": -2,
+                "message": "客户已预约"
+            })
         client.clientStatus = 4
         client.appointerId = appointerId
         client.appointDate = appointDate if appointDate else None
@@ -354,6 +398,11 @@ async def cancelReserve(request):
 
     try:
         # 重置预约相关字段
+        if client.clientStatus == 3:
+            return jsonify({
+                "status": -2,
+                "message": "客户未预约"
+            })
         client.clientStatus = 3
         client.appointerId = None
         client.appointDate = None
@@ -374,4 +423,98 @@ async def cancelReserve(request):
         return jsonify({
             "status": 500,
             "message": f"取消预约失败：{str(e)}"
+        })
+
+
+# 确认成单 / 签署合同
+@extraRouter.post("/confirmCooperation")
+async def confirmCooperation(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    clientId = data.get("clientId")
+    contractNo = data.get("contractNo")
+    cooperateTime = data.get("cooperateTime")
+
+    try:
+        client = session.query(Client).get(clientId)
+        if not client:
+            return jsonify({
+                "status": 400,
+                "message": "客户不存在"
+            })
+
+        # 更新客户状态为已成单
+        if client.processStatus == 2:
+            return jsonify({
+                "status": -2,
+                "message": "客户已成单"
+            })
+        client.processStatus = 2
+        client.contractNo = contractNo
+        client.cooperateTime = datetime.strptime(cooperateTime, '%m/%d/%Y')
+
+        # 记录操作日志
+        log = Log(operatorId=userId, operation=f"客户：{client.name}确认成单，合同编号：{contractNo}")
+        session.add(log)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "签约成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"签约失败：{str(e)}"
+        })
+
+
+@extraRouter.post("/cancelCooperation")
+async def cancelCooperation(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    clientId = data.get("clientId")
+
+    try:
+        client = session.query(Client).get(clientId)
+        if not client:
+            return jsonify({
+                "status": 400,
+                "message": "客户不存在"
+            })
+
+        # 更新客户状态为未成单
+        client.processStatus = 1
+        client.contractNo = None
+        client.cooperateTime = None
+
+        # 记录操作日志
+        log = Log(operatorId=userId, operation=f"客户：{client.name}取消成单")
+        session.add(log)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "取消成单成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"取消成单失败：{str(e)}"
         })

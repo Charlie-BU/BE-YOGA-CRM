@@ -161,6 +161,8 @@ class Client(Base):
     appointDate = Column(Date, nullable=True)
     # 下次沟通日期
     nextTalkDate = Column(Date, nullable=True)
+    # 合同编号
+    contractNo = Column(Text, nullable=True)
     # 成单时间
     cooperateTime = Column(DateTime, nullable=True)
 
@@ -194,6 +196,7 @@ class Client(Base):
             "appointDate": self.appointDate,
             "nextTalkDate": self.nextTalkDate,
             "cooperateTime": self.cooperateTime,
+            "contractNo": self.contractNo,
         }
         if self.affiliatedUserId:
             data["affiliatedUserName"] = self.affiliatedUser.username
