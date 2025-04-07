@@ -131,12 +131,14 @@ class Client(Base):
 
     # 预约人
     appointerId = Column(Integer, nullable=True)
+
     @property
     def appointerName(self):
         appointer = session.query(User).get(self.appointerId)
         if not appointer:
             return ""
         return appointer.username
+
     # 所在校区
     @property
     def schoolName(self):
@@ -148,6 +150,7 @@ class Client(Base):
 
     # 课程（多个）
     courseIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
+
     @property
     def courseNames(self):
         if not self.courseIds or len(self.courseIds) == 0:
@@ -155,6 +158,7 @@ class Client(Base):
         courses = [session.query(Course).get(id) for id in self.courseIds]
         courseNames = [course.name for course in courses]
         return ", ".join(courseNames)
+
     # 跟进状态：1未成单 / 2已成单
     processStatus = Column(Integer, nullable=True, default=1)
     # 预约日期
@@ -246,6 +250,40 @@ class Course(Base):
             data["creatorName"] = self.creator.username
         if self.schoolId:
             data["schoolName"] = self.school.name
+        return data
+
+
+class Payment(Base):
+    __tablename__ = "payment"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    clientId = Column(Integer, ForeignKey("client.id"), nullable=True)
+    client = relationship("Client", backref="payments")
+    # 负责老师
+    teacherId = Column(Integer, ForeignKey("user.id"), nullable=True)
+    teacher = relationship("User", backref="payments")
+    # 金额：单位元，正为收入，负为支出
+    amount = Column(Integer, nullable=True)
+    # 类别：1定金 / 2尾款 / 3其他
+    category = Column(Integer, nullable=True)
+    # 交易方式：1现金 / 2微信 / 3支付宝 / 4POS / 5对公 / 6其他
+    paymentMethod = Column(Integer, nullable=True)
+    # 备注
+    info = Column(Text, nullable=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "clientId": self.clientId,
+            "teacherId": self.teacherId,
+            "amount": self.amount,
+            "category": self.category,
+            "paymentMethod": self.paymentMethod,
+            "info": self.info,
+        }
+        if self.clientId:
+            data["clientName"] = self.client.name
+        if self.teacherId:
+            data["teacherName"] = self.teacher.username
         return data
 
 

@@ -148,3 +148,166 @@ async def modifyPwd(request):
         "status": 200,
         "message": "密码修改成功"
     })
+
+
+@userRouter.post("/getAllUsers")
+async def getAllUsers(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    data = request.json()
+    page_index = data.get("pageIndex", 1)  # 当前页码，默认第一页
+    page_size = data.get("pageSize", 100000)  # 每页数量，默认全部
+    offset = (int(page_index) - 1) * int(page_size)
+    name = data.get("name", "")
+    try:
+        # 获取分页数据
+        query = session.query(User)
+        if name:
+            query = query.filter(User.username.like(f"%{name}%"))
+        users = query.offset(offset).limit(page_size).all()
+        users = [User.to_json(user) for user in users]
+        # 获取总数
+        total = query.count()
+        return jsonify({
+            "status": 200,
+            "message": "分页获取成功",
+            "users": users,
+            "total": total
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取用户列表失败：{str(e)}"
+        })
+
+
+@userRouter.post("/updateUser")
+async def updateUser(request):
+    sessionid = request.headers.get("sessionid")
+    operatorId = checkSessionid(sessionid).get("userId")
+    if not operatorId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    user_id = data.get("id")
+
+    try:
+        # 获取操作者信息，检查权限
+        operator = session.query(User).get(operatorId)
+        if not operator or operator.usertype <= 1:
+            return jsonify({
+                "status": -2,
+                "message": "无权限进行此操作"
+            })
+
+        # 查找要更新的用户
+        user = session.query(User).get(user_id)
+        if not user:
+            return jsonify({
+                "status": -3,
+                "message": "用户不存在"
+            })
+
+        # 更新用户信息
+        for key, value in data.items():
+            if value == "null" or not value:
+                continue
+            if hasattr(user, key):
+                try:
+                    setattr(user, key, value)
+                except Exception:
+                    continue
+
+        # 记录操作日志
+        log = Log(
+            operatorId=operatorId,
+            operation=f"更新用户信息：{user.username}"
+        )
+        session.add(log)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "更新成功"
+        })
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": -4,
+            "message": f"更新失败：{str(e)}"
+        })
+
+
+# 删除用户
+@userRouter.post("/deleteUser")
+async def deleteUser(request):
+    sessionid = request.headers.get("sessionid")
+    operatorId = checkSessionid(sessionid).get("userId")
+    if not operatorId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    user_id = data.get("id")
+
+    try:
+        # 获取操作者信息，检查权限
+        operator = session.query(User).get(operatorId)
+        if not operator or operator.usertype <= 1:
+            return jsonify({
+                "status": -2,
+                "message": "无权限进行此操作"
+            })
+
+        # 查找要删除的用户
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            return jsonify({
+                "status": -3,
+                "message": "用户不存在"
+            })
+        if user_id == operatorId:
+            return jsonify({
+                "status": -6,
+                "message": "不能删除自己"
+            })
+        # 不允许删除超级管理员
+        if user.usertype == 6:
+            return jsonify({
+                "status": -4,
+                "message": "不能删除超级管理员"
+            })
+
+        # 记录操作日志
+        log = Log(
+            operatorId=operatorId,
+            operation=f"删除用户：{user.username}"
+        )
+        session.add(log)
+
+        # 删除用户
+        session.delete(user)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "删除成功"
+        })
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": -5,
+            "message": f"删除失败：{str(e)}"
+        })

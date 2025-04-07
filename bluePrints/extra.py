@@ -518,3 +518,50 @@ async def cancelCooperation(request):
             "status": 500,
             "message": f"取消成单失败：{str(e)}"
         })
+
+
+# 客户付款
+@extraRouter.post("/submitPayment")
+async def submitPayment(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    try:
+        # 创建支付记录
+        payment = Payment(
+            clientId=data.get("clientId"),
+            teacherId=data.get("teacherId"),
+            amount=data.get("amount"),
+            category=data.get("category"),      # 1为定金，2为尾款，3为其他
+            paymentMethod=data.get("paymentMethod"),
+            info=data.get("info")
+        )
+        session.add(payment)
+
+        # 记录操作日志
+        client = session.query(Client).get(data.get("clientId"))
+        teacher = session.query(User).get(data.get("teacherId"))
+        payType = "交定金" if data.get("category") == 1 else "交尾款" if data.get("category") == 2 else "付款"
+        log = Log(
+            operatorId=userId,
+            operation=f"客户：{client.name}{payType}{data.get('amount')}元，负责老师：{teacher.username}"
+        )
+        session.add(log)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "付款成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"付款失败：{str(e)}"
+        })
