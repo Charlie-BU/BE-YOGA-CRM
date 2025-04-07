@@ -56,16 +56,19 @@ async def loginCheck(request):
             "status": -2,
             "message": "登录已过期，请重新登录"
         })
-    user = session.query(User).get(userId)
-    return jsonify({
-        "status": 200,
-        "message": "用户已登录",
-        "data": {
-            "id": user.id,
-            "username": user.username,
-            "usertype": user.usertype,
-        }
-    })
+    try:
+        user = session.query(User).get(userId)
+        return jsonify({
+            "status": 200,
+            "message": "用户已登录",
+            "data": {
+                "id": user.id,
+                "username": user.username,
+                "usertype": user.usertype,
+            }
+        })
+    except Exception:
+        session.rollback()
 
 
 @userRouter.post("/getUserInfo")
