@@ -25,7 +25,8 @@ async def getClueClients(request):
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
     # 获取分页数据
-    query = session.query(Client).filter(Client.clientStatus.in_([1, 2]))
+    # query = session.query(Client).filter(Client.clientStatus.in_([1, 2]))
+    query = session.query(Client).order_by(Client.clientStatus)       # 定为全部客户
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
     clients = query.offset(offset).limit(page_size).all()
@@ -564,4 +565,40 @@ async def submitPayment(request):
         return jsonify({
             "status": 500,
             "message": f"付款失败：{str(e)}"
+        })
+
+
+# 获取客户付款记录
+@extraRouter.post("/getClientPayments")
+async def getClientPayments(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    client_id = data.get("clientId")
+
+    if not client_id:
+        return jsonify({
+            "status": 400,
+            "message": "缺少客户ID"
+        })
+
+    try:
+        # 获取该客户的所有交易记录
+        payments = session.query(Payment).filter(
+            Payment.clientId == client_id
+        ).order_by(Payment.paymentTime.desc()).all()
+        return jsonify({
+            "status": 200,
+            "payments": [Payment.to_json(payment) for payment in payments]
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取交易记录失败：{str(e)}"
         })

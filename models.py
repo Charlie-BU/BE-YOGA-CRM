@@ -269,6 +269,7 @@ class Payment(Base):
     paymentMethod = Column(Integer, nullable=True)
     # 备注
     info = Column(Text, nullable=True)
+    paymentTime = Column(DateTime, nullable=True, default=datetime.now)
 
     def to_json(self):
         data = {
@@ -279,6 +280,7 @@ class Payment(Base):
             "category": self.category,
             "paymentMethod": self.paymentMethod,
             "info": self.info,
+            "paymentTime": self.paymentTime,
         }
         if self.clientId:
             data["clientName"] = self.client.name

@@ -7,11 +7,11 @@
       <jdbc-url>jdbc:db2://124.223.93.75:50000/YOGA</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="yoga" uuid="99a10c98-e263-4033-8f2b-760d87c02c1f">
+    <data-source source="LOCAL" name="yoga@8.153.204.238" uuid="6d5c8208-ba15-4f4c-b7cf-42f601ddaa44">
       <driver-ref>mysql.8</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>com.mysql.cj.jdbc.Driver</jdbc-driver>
-      <jdbc-url>jdbc:mysql://124.223.93.75:3306/yoga</jdbc-url>
+      <jdbc-url>jdbc:mysql://8.153.204.238:3306/yoga</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>
