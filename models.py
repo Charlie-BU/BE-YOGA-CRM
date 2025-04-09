@@ -81,12 +81,14 @@ class Department(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, nullable=True)
     phone = Column(Text, nullable=True)
+    info = Column(Text, nullable=True)
 
     def to_json(self):
         data = {
             "id": self.id,
             "name": self.name,
             "phone": self.phone,
+            "info": self.info,
         }
         return data
 
@@ -121,8 +123,15 @@ class Client(Base):
     # 所属人 / 负责人 / 合作老师
     affiliatedUserId = Column(Integer, ForeignKey("user.id"), nullable=True)
     affiliatedUser = relationship("User", backref="cooperateStudents")
-    # 创建人id
-    createdUserId = Column(Integer, nullable=True)
+    # 创建人
+    creatorId = Column(Integer, nullable=True)
+    @property
+    def creatorName(self):
+        creator = session.query(User).get(self.creatorId)
+        if not creator:
+            return ""
+        return creator.username
+
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
     # 备注（公海时用）
     info = Column(Text, nullable=True)
@@ -187,7 +196,8 @@ class Client(Base):
             "address": self.address,
             "clientStatus": self.clientStatus,
             "affiliatedUserId": self.affiliatedUserId,
-            "createdUserId": self.createdUserId,
+            "creatorId": self.creatorId,
+            "creatorName": self.creatorName,
             "createdTime": self.createdTime,
             "info": self.info,
             "detailedInfo": self.detailedInfo,
@@ -211,12 +221,14 @@ class School(Base):
     __tablename__ = "school"
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, nullable=True)
+    address = Column(Text, nullable=True)
     info = Column(Text, nullable=True)
 
     def to_json(self):
         data = {
             "id": self.id,
             "name": self.name,
+            "address": self.address,
             "info": self.info,
         }
         return data

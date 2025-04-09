@@ -311,3 +311,54 @@ async def deleteUser(request):
             "status": -5,
             "message": f"删除失败：{str(e)}"
         })
+
+
+@userRouter.post("/initUserPwd")
+async def initUserPwd(request):
+    sessionid = request.headers.get("sessionid")
+    curr_user = checkSessionid(sessionid).get("userId")
+    if not curr_user:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    # 检查当前用户权限
+    curr_user_info = session.query(User).get(curr_user)
+    if not curr_user_info or curr_user_info.usertype <= 1:
+        return jsonify({
+            "status": 403,
+            "message": "无权限执行此操作"
+        })
+
+    data = request.json()
+    user_id = data.get("id")
+
+    if not user_id:
+        return jsonify({
+            "status": 400,
+            "message": "缺少用户ID"
+        })
+
+    try:
+        # 获取用户信息
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            return jsonify({
+                "status": 404,
+                "message": "用户不存在"
+            })
+
+        user.hashedPassword = User.hashPassword("12345")
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "密码初始化成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"密码初始化失败：{str(e)}"
+        })

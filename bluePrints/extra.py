@@ -26,7 +26,7 @@ async def getClueClients(request):
     name = data.get("name", "")
     # 获取分页数据
     # query = session.query(Client).filter(Client.clientStatus.in_([1, 2]))
-    query = session.query(Client).order_by(Client.clientStatus)       # 定为全部客户
+    query = session.query(Client).order_by(Client.clientStatus, Client.createdTime.desc())       # 定为全部客户
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
     clients = query.offset(offset).limit(page_size).all()
@@ -59,7 +59,7 @@ async def getClients(request):
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
     # 获取分页数据
-    query = session.query(Client).filter(Client.clientStatus == clientStatus)
+    query = session.query(Client).filter(Client.clientStatus == clientStatus).order_by(Client.createdTime.desc())
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
     clients = query.offset(offset).limit(page_size).all()
@@ -136,7 +136,7 @@ async def addClient(request):
             })
     try:
         # 添加创建人和创建时间信息
-        data['createdUserId'] = userId
+        data['creatorId'] = userId
         # 创建新客户
         new_client = Client(**data)
         session.add(new_client)
@@ -601,4 +601,92 @@ async def getClientPayments(request):
         return jsonify({
             "status": 500,
             "message": f"获取交易记录失败：{str(e)}"
+        })
+
+
+# 批量导入线索
+@extraRouter.post("/batchImportClues")
+async def batchImportClues(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    clues = data.get("clues")
+    clues = json.loads(clues)
+
+    if not clues or not isinstance(clues, list):
+        return jsonify({
+            "status": 400,
+            "message": "无效的导入数据"
+        })
+
+    try:
+        success_count = 0
+        error_count = 0
+
+        for clue in clues:
+            try:
+                # 数据转换
+                new_clue = {
+                    "name": clue.get("姓名", ""),
+                    "gender": 1 if clue.get("性别") == "男" else 2 if clue.get("性别") == "女" else None,
+                    "age": int(clue.get("年龄", 0)) if clue.get("年龄") else None,
+                    "IDNumber": clue.get("身份证", ""),
+                    "phone": clue.get("电话", ""),
+                    "weixin": clue.get("微信", ""),
+                    "QQ": clue.get("QQ", ""),
+                    "douyin": clue.get("抖音", ""),
+                    "rednote": clue.get("小红书", ""),
+                    "shangwutong": clue.get("商务通", ""),
+                    "address": clue.get("地区", ""),
+                    "info": clue.get("备注", ""),
+                    "clientStatus": 1,  # 线索状态
+                    "creatorId": userId
+                }
+
+                # 验证必填字段
+                if not new_clue["name"] or not new_clue["weixin"]:
+                    error_count += 1
+                    continue
+
+                # 检查是否已存在（根据姓名和微信号）
+                existing = session.query(Client).filter(
+                    Client.name == new_clue["name"],
+                    Client.weixin == new_clue["weixin"]
+                ).first()
+
+                if existing:
+                    error_count += 1
+                    continue
+
+                # 创建新线索
+                client = Client(**new_clue)
+                session.add(client)
+                success_count += 1
+
+            except Exception as e:
+                error_count += 1
+                continue
+
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": f"导入完成：成功{success_count}条，失败{error_count}条",
+            "data": {
+                "success": success_count,
+                "error": error_count
+            }
+        })
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"导入失败：{str(e)}"
         })
