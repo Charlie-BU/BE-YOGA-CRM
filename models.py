@@ -238,14 +238,45 @@ class Course(Base):
     __tablename__ = "course"
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, nullable=True)
-    # 分类：1瑜伽课
-    category = Column(Text, nullable=True)
+    # 分类：1全日制 / 2周末班
+    category = Column(Integer, nullable=True)
     creatorId = Column(Integer, ForeignKey("user.id"), nullable=True)
+    creator = relationship("User", backref="createdCourses")
     # 所属校区
     schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
     school = relationship("School", backref="courses")
-    creator = relationship("User", backref="createdCourses")
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
+    # 课时：周
+    duration = Column(Float, nullable=True)
+    price = Column(Float, nullable=True)
+    # 主讲人
+    chiefTeacherId = Column(Integer, nullable=True)
+    @property
+    def chiefTeacherName(self):
+        chiefTeacher = session.query(User).get(self.chiefTeacherId)
+        if chiefTeacher:
+            return chiefTeacher.username
+        else:
+            return ""
+    # 班主任
+    classTeacherId = Column(Integer, nullable=True)
+    @property
+    def classTeacherName(self):
+        classTeacher = session.query(User).get(self.classTeacherId)
+        if classTeacher:
+            return classTeacher.username
+        else:
+            return ""
+    # 助教
+    teachingAssistantId = Column(Integer, nullable=True)
+    @property
+    def teachingAssistantName(self):
+        teachingAssistant = session.query(User).get(self.teachingAssistantId)
+        if teachingAssistant:
+            return teachingAssistant.username
+        else:
+            return ""
+
     info = Column(Text, nullable=True)
 
     def to_json(self):
@@ -256,6 +287,14 @@ class Course(Base):
             "schoolId": self.schoolId,
             "creatorId": self.creatorId,
             "createdTime": self.createdTime,
+            "duration": self.duration,
+            "price": self.price,
+            "chiefTeacherId": self.chiefTeacherId,
+            "chiefTeacherName": self.chiefTeacherName,
+            "classTeacherId": self.classTeacherId,
+            "classTeacherName": self.classTeacherName,
+            "teachingAssistantId": self.teachingAssistantId,
+            "teachingAssistantName": self.teachingAssistantName,
             "info": self.info,
         }
         if self.creatorId:
