@@ -257,3 +257,195 @@ async def deleteCourse(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+
+
+# @courseRouter.post("/getAllCombos")
+# async def getAllCombos(request):
+#     sessionid = request.headers.get("sessionid")
+#     userId = checkSessionid(sessionid).get("userId")
+#     if not userId:
+#         return jsonify({
+#             "status": -1,
+#             "message": "用户未登录"
+#         })
+# 
+#     try:
+#         combos = session.query(CourseCombo).all()
+#         return jsonify({
+#             "status": 200,
+#             "combos": [combo.to_json() for combo in combos]
+#         })
+#     except Exception as e:
+#         return jsonify({
+#             "status": 500,
+#             "message": f"获取套餐列表失败：{str(e)}"
+#         })
+
+@courseRouter.post("/getAllCombos")
+async def getAllCombos(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    try:
+        data = request.json()
+        pageIndex = data.get('pageIndex', 1)
+        pageSize = data.get('pageSize', 10)
+
+        # 计算分页
+        offset = (int(pageIndex) - 1) * int(pageSize)
+
+        # 获取总数
+        total = session.query(CourseCombo).count()
+
+        # 获取分页数据
+        combos = session.query(CourseCombo).offset(offset).limit(pageSize).all()
+
+        return jsonify({
+            "status": 200,
+            "combos": [combo.to_json() for combo in combos],
+            "total": total
+        })
+    except Exception as e:
+        print(e)
+        return jsonify({
+            "status": 500,
+            "message": f"获取套餐列表失败：{str(e)}"
+        })
+
+
+@courseRouter.post("/addCombo")
+async def addCombo(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    try:
+        data = request.json()
+        courseIds = data.get('courseIds', [])
+        courseIds = json.loads(courseIds)
+        new_combo = CourseCombo(
+            name=data.get('name'),
+            courseIds=courseIds,
+            price=data.get('price'),
+            info=data.get('info'),
+        )
+        session.add(new_combo)
+
+        # 记录操作日志
+        log = Log(
+            operatorId=userId,
+            operation=f"新增套餐：{data.get('name')}",
+        )
+        session.add(log)
+
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "添加成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"添加套餐失败：{str(e)}"
+        })
+
+
+@courseRouter.post("/updateCombo")
+async def updateCombo(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    try:
+        data = request.json()
+        combo = session.query(CourseCombo).filter(CourseCombo.id == data.get('id')).first()
+        if not combo:
+            return jsonify({
+                "status": 404,
+                "message": "套餐不存在"
+            })
+
+        # 记录原始数据用于日志
+        old_name = combo.name
+        courseIds = data.get('courseIds', [])
+        courseIds = json.loads(courseIds)
+        # 更新数据
+        combo.name = data.get('name')
+        combo.courseIds = courseIds
+        combo.price = data.get('price')
+        combo.info = data.get('info')
+
+        # 记录操作日志
+        log = Log(
+            operatorId=userId,
+            operation=f"更新套餐：{old_name} -> {data.get('name')}",
+        )
+        session.add(log)
+
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "更新成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"更新套餐失败：{str(e)}"
+        })
+
+
+@courseRouter.post("/deleteCombo")
+async def deleteCombo(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    try:
+        data = request.json()
+        combo = session.query(CourseCombo).filter(CourseCombo.id == data.get('id')).first()
+        if not combo:
+            return jsonify({
+                "status": 404,
+                "message": "套餐不存在"
+            })
+
+        # 记录操作日志
+        log = Log(
+            operatorId=userId,
+            operation=f"删除套餐：{combo.name}"
+        )
+        session.add(log)
+
+        # 删除套餐
+        session.delete(combo)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "删除成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"删除套餐失败：{str(e)}"
+        })

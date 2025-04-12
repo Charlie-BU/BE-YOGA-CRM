@@ -160,6 +160,8 @@ class Client(Base):
 
     # 课程（多个）
     courseIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
+    # 套餐，可有可无
+    comboId = Column(Integer, nullable=True)
 
     @property
     def courseNames(self):
@@ -209,6 +211,7 @@ class Client(Base):
             "schoolName": self.schoolName,
             "courseIds": self.courseIds,
             "courseNames": self.courseNames,
+            "comboId": self.comboId,
             "processStatus": self.processStatus,
             "appointDate": self.appointDate,
             "nextTalkDate": self.nextTalkDate,
@@ -218,6 +221,11 @@ class Client(Base):
         }
         if self.affiliatedUserId:
             data["affiliatedUserName"] = self.affiliatedUser.username
+        if self.comboId:
+            combo = session.query(CourseCombo).get(self.comboId)
+            if combo:
+                data["comboName"] = combo.showName
+                data["comboPrice"] = combo.price
         return data
 
 
@@ -310,6 +318,35 @@ class Course(Base):
             data["creatorName"] = self.creator.username
         if self.schoolId:
             data["schoolName"] = self.school.name
+        return data
+
+
+# 课程套餐
+class CourseCombo(Base):
+    __tablename__ = "course_combo"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=True)
+    price = Column(Float, nullable=True)
+    @property
+    def showName(self):
+        return self.name + " - " + str(format(self.price, '.2f')) + "元"
+    # 包含课程
+    courseIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
+    info = Column(Text, nullable=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "showName": self.showName,
+            "price": self.price,
+            "courseIds": self.courseIds,
+            "info": self.info,
+        }
+        # 课程名列表
+        if self.courseIds and len(self.courseIds) > 0:
+            courses = [session.query(Course).get(courseId) for courseId in self.courseIds]
+            data["courseNames"] = [course.name for course in courses]
         return data
 
 

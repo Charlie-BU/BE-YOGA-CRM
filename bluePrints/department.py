@@ -439,3 +439,4 @@ async def deleteSchool(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+

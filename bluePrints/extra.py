@@ -26,7 +26,7 @@ async def getClueClients(request):
     name = data.get("name", "")
     # 获取分页数据
     # query = session.query(Client).filter(Client.clientStatus.in_([1, 2]))
-    query = session.query(Client).order_by(Client.clientStatus, Client.createdTime.desc())       # 定为全部客户
+    query = session.query(Client).order_by(Client.clientStatus, Client.createdTime.desc())  # 定为全部客户
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
     clients = query.offset(offset).limit(page_size).all()
@@ -349,6 +349,11 @@ async def submitReserve(request):
     if appointDate:
         # 日期格式处理
         appointDate = datetime.strptime(appointDate, '%m/%d/%Y')
+
+    useCombo = data.get("useCombo")
+    if useCombo:
+        client.comboId = data.get("comboId", None)
+
     courseIds = data.get("courseIds")
     courseIds = json.loads(courseIds)
     nextTalkDate = data.get("nextTalkDate")
@@ -539,7 +544,7 @@ async def submitPayment(request):
             clientId=data.get("clientId"),
             teacherId=data.get("teacherId"),
             amount=data.get("amount"),
-            category=data.get("category"),      # 1为定金，2为尾款，3为其他
+            category=data.get("category"),  # 1为定金，2为尾款，3为其他
             paymentMethod=data.get("paymentMethod"),
             info=data.get("info")
         )
