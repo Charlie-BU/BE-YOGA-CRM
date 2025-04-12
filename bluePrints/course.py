@@ -45,6 +45,33 @@ async def getCourses(request):
         })
 
 
+@courseRouter.post("/getCoursesByIds")
+async def getCoursesByIds(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    courseIds = data.get("courseIds", [])
+    courseIds = json.loads(courseIds)
+
+    try:
+        courses = session.query(Course).filter(Course.id.in_(courseIds)).all()
+        return jsonify({
+            "status": 200,
+            "courses": [course.to_json() for course in courses]
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取课程信息失败：{str(e)}"
+        })
+
+
 # TODO: 下面三个路由都需要加日志
 @courseRouter.post("/addCourse")
 async def addCourse(request):
@@ -90,6 +117,11 @@ async def addCourse(request):
             createdTime=datetime.now()
         )
         session.add(new_course)
+        log = Log(
+            operatorId=userId,
+            operation=f"添加课程：{data['name']}"
+        )
+        session.add(log)
         session.commit()
 
         return jsonify({
@@ -159,7 +191,11 @@ async def updateCourse(request):
                     setattr(course, field, data[field])
                 except Exception:
                     continue
-
+        log = Log(
+            operatorId=userId,
+            operation=f"更新课程：{course.name}"
+        )
+        session.add(log)
         session.commit()
         return jsonify({
             "status": 200,
@@ -204,6 +240,11 @@ async def deleteCourse(request):
 
         # 删除课程
         session.delete(course)
+        log = Log(
+            operatorId=userId,
+            operation=f"删除课程：{course.name}"
+        )
+        session.add(log)
         session.commit()
 
         return jsonify({

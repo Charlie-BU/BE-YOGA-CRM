@@ -125,6 +125,7 @@ class Client(Base):
     affiliatedUser = relationship("User", backref="cooperateStudents")
     # 创建人
     creatorId = Column(Integer, nullable=True)
+
     @property
     def creatorName(self):
         creator = session.query(User).get(self.creatorId)
@@ -178,6 +179,8 @@ class Client(Base):
     contractNo = Column(Text, nullable=True)
     # 成单时间
     cooperateTime = Column(DateTime, nullable=True)
+    # 已学总课时：周
+    learnedWeeks = Column(Float, nullable=True, default=0.0)
 
     def to_json(self):
         data = {
@@ -211,6 +214,7 @@ class Client(Base):
             "nextTalkDate": self.nextTalkDate,
             "cooperateTime": self.cooperateTime,
             "contractNo": self.contractNo,
+            "learnedWeeks": self.learnedWeeks,
         }
         if self.affiliatedUserId:
             data["affiliatedUserName"] = self.affiliatedUser.username
@@ -251,6 +255,7 @@ class Course(Base):
     price = Column(Float, nullable=True)
     # 主讲人
     chiefTeacherId = Column(Integer, nullable=True)
+
     @property
     def chiefTeacherName(self):
         chiefTeacher = session.query(User).get(self.chiefTeacherId)
@@ -258,8 +263,10 @@ class Course(Base):
             return chiefTeacher.username
         else:
             return ""
+
     # 班主任
     classTeacherId = Column(Integer, nullable=True)
+
     @property
     def classTeacherName(self):
         classTeacher = session.query(User).get(self.classTeacherId)
@@ -267,8 +274,10 @@ class Course(Base):
             return classTeacher.username
         else:
             return ""
+
     # 助教
     teachingAssistantId = Column(Integer, nullable=True)
+
     @property
     def teachingAssistantName(self):
         teachingAssistant = session.query(User).get(self.teachingAssistantId)
