@@ -360,7 +360,7 @@ class Payment(Base):
     teacher = relationship("User", backref="payments")
     # 金额：单位元，正为收入，负为支出
     amount = Column(Integer, nullable=True)
-    # 类别：1定金 / 2尾款 / 3其他
+    # 类别：1定金 / 2尾款 / 3住宿费 / 4补差价 / 5其他
     category = Column(Integer, nullable=True)
     # 交易方式：1现金 / 2微信 / 3支付宝 / 4POS / 5对公 / 6其他
     paymentMethod = Column(Integer, nullable=True)

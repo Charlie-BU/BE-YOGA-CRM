@@ -74,6 +74,37 @@ async def getClients(request):
     })
 
 
+# 获取成单客户
+@extraRouter.post("/getDealedClients")
+async def getDealedClients(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    data = request.json()
+    page_index = data.get("pageIndex", 1)  # 当前页码，默认第一页
+    page_size = data.get("pageSize", 10)  # 每页数量，默认10条
+    offset = (int(page_index) - 1) * int(page_size)
+    name = data.get("name", "")
+    # 获取分页数据
+    query = session.query(Client).filter(Client.processStatus == 2).order_by(Client.clientStatus, Client.createdTime.desc())
+    if name:
+        query = query.filter(Client.name.like(f"%{name}%"))
+    clients = query.offset(offset).limit(page_size).all()
+    clients = [Client.to_json(client) for client in clients]
+    # 获取总数
+    total = query.count()
+    return jsonify({
+        "status": 200,
+        "message": "分页获取成功",
+        "clients": clients,
+        "total": total
+    })
+
+
 @extraRouter.post("/updateClient")
 async def updateClient(request):
     sessionid = request.headers.get("sessionid")
