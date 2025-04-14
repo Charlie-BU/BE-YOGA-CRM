@@ -81,6 +81,9 @@ class Department(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, nullable=True)
     phone = Column(Text, nullable=True)
+    # 所属校区
+    schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
+    school = relationship("School", backref="departments")
     info = Column(Text, nullable=True)
 
     def to_json(self):
@@ -88,6 +91,7 @@ class Department(Base):
             "id": self.id,
             "name": self.name,
             "phone": self.phone,
+            "schoolId": self.schoolId,
             "info": self.info,
         }
         return data

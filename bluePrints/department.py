@@ -132,14 +132,23 @@ async def addDept(request):
     data = request.json()
     name = data.get("name")
     info = data.get("info", "")
+    school_id = data.get("schoolId")  # 添加校区ID
 
-    if not name:
+    if not name or not school_id:  # 检查必填字段
         return jsonify({
             "status": 400,
-            "message": "部门名称不能为空"
+            "message": "部门名称和所属校区不能为空"
         })
 
     try:
+        # 检查校区是否存在
+        school = session.query(School).filter(School.id == school_id).first()
+        if not school:
+            return jsonify({
+                "status": 400,
+                "message": "所选校区不存在"
+            })
+
         # 检查部门名称是否已存在
         existing = session.query(Department).filter(Department.name == name).first()
         if existing:
@@ -152,6 +161,7 @@ async def addDept(request):
         new_dept = Department(
             name=name,
             info=info,
+            schoolId=school_id  # 添加校区ID
         )
         session.add(new_dept)
         session.commit()
@@ -182,8 +192,9 @@ async def updateDept(request):
     dept_id = data.get("id")
     name = data.get("name")
     info = data.get("info", "")
+    school_id = data.get("schoolId")  # 添加校区ID
 
-    if not dept_id or not name:
+    if not dept_id or not name or not school_id:  # 检查必填字段
         return jsonify({
             "status": 400,
             "message": "参数错误"
@@ -196,6 +207,14 @@ async def updateDept(request):
             return jsonify({
                 "status": 404,
                 "message": "部门不存在"
+            })
+
+        # 检查校区是否存在
+        school = session.query(School).filter(School.id == school_id).first()
+        if not school:
+            return jsonify({
+                "status": 400,
+                "message": "所选校区不存在"
             })
 
         # 检查新名称是否与其他部门重复
@@ -212,6 +231,7 @@ async def updateDept(request):
         # 更新部门信息
         dept.name = name
         dept.info = info
+        dept.schoolId = school_id  # 添加校区ID
         session.commit()
 
         return jsonify({
@@ -439,4 +459,3 @@ async def deleteSchool(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
-
