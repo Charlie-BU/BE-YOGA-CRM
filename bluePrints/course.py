@@ -23,12 +23,17 @@ async def getCourses(request):
     pageIndex = data.get("pageIndex", 1)
     pageSize = data.get("pageSize", 10)
 
+    schoolId = data.get("schoolId")
     try:
+        if schoolId:
+            query = session.query(Course).filter(Course.schoolId == schoolId)
+        else:
+            query = session.query(Course)
         # 获取总数
-        total = session.query(Course).count()
+        total = query.count()
 
         # 获取分页数据
-        courses = session.query(Course).order_by(Course.schoolId, Course.createdTime.desc()) \
+        courses = query.order_by(Course.schoolId, Course.createdTime.desc()) \
             .offset((int(pageIndex) - 1) * int(pageSize)) \
             .limit(pageSize) \
             .all()
@@ -72,7 +77,6 @@ async def getCoursesByIds(request):
         })
 
 
-# TODO: 下面三个路由都需要加日志
 @courseRouter.post("/addCourse")
 async def addCourse(request):
     sessionid = request.headers.get("sessionid")
@@ -110,8 +114,8 @@ async def addCourse(request):
             duration=data['duration'],
             price=data['price'],
             chiefTeacherId=data['chiefTeacherId'],
-            classTeacherId=data.get('classTeacherId'),
-            teachingAssistantId=data.get('teachingAssistantId'),
+            classTeacherId=data.get('classTeacherId') if data.get('classTeacherId') else None,
+            teachingAssistantId=data.get('teachingAssistantId') if data.get('teachingAssistantId') else None,
             info=data.get('info', ''),
             creatorId=userId,
             createdTime=datetime.now()
@@ -259,28 +263,6 @@ async def deleteCourse(request):
         })
 
 
-# @courseRouter.post("/getAllCombos")
-# async def getAllCombos(request):
-#     sessionid = request.headers.get("sessionid")
-#     userId = checkSessionid(sessionid).get("userId")
-#     if not userId:
-#         return jsonify({
-#             "status": -1,
-#             "message": "用户未登录"
-#         })
-# 
-#     try:
-#         combos = session.query(CourseCombo).all()
-#         return jsonify({
-#             "status": 200,
-#             "combos": [combo.to_json() for combo in combos]
-#         })
-#     except Exception as e:
-#         return jsonify({
-#             "status": 500,
-#             "message": f"获取套餐列表失败：{str(e)}"
-#         })
-
 @courseRouter.post("/getAllCombos")
 async def getAllCombos(request):
     sessionid = request.headers.get("sessionid")
@@ -296,14 +278,19 @@ async def getAllCombos(request):
         pageIndex = data.get('pageIndex', 1)
         pageSize = data.get('pageSize', 10)
 
+        schoolId = data.get('schoolId')
         # 计算分页
         offset = (int(pageIndex) - 1) * int(pageSize)
 
+        if schoolId:
+            query = session.query(CourseCombo).filter(CourseCombo.schoolId == schoolId)
+        else:
+            query = session.query(CourseCombo)
         # 获取总数
-        total = session.query(CourseCombo).count()
+        total = query.count()
 
         # 获取分页数据
-        combos = session.query(CourseCombo).offset(offset).limit(pageSize).all()
+        combos = query.offset(offset).limit(pageSize).all()
 
         return jsonify({
             "status": 200,
@@ -335,15 +322,20 @@ async def addCombo(request):
         new_combo = CourseCombo(
             name=data.get('name'),
             courseIds=courseIds,
+            schoolId=data.get('schoolId'),
             price=data.get('price'),
             info=data.get('info'),
         )
         session.add(new_combo)
 
+        # 获取校区名称用于日志
+        school = session.query(School).filter(School.id == data.get('schoolId')).first()
+        school_name = school.name if school else "未知校区"
+
         # 记录操作日志
         log = Log(
             operatorId=userId,
-            operation=f"新增套餐：{data.get('name')}",
+            operation=f"新增套餐：{data.get('name')}，所属校区：{school_name}",
         )
         session.add(log)
 
@@ -381,18 +373,26 @@ async def updateCombo(request):
 
         # 记录原始数据用于日志
         old_name = combo.name
+        old_school = session.query(School).filter(School.id == combo.schoolId).first()
+        old_school_name = old_school.name if old_school else "未知校区"
+
         courseIds = data.get('courseIds', [])
         courseIds = json.loads(courseIds)
         # 更新数据
         combo.name = data.get('name')
         combo.courseIds = courseIds
+        combo.schoolId = data.get('schoolId')
         combo.price = data.get('price')
         combo.info = data.get('info')
+
+        # 获取新校区名称用于日志
+        new_school = session.query(School).filter(School.id == data.get('schoolId')).first()
+        new_school_name = new_school.name if new_school else "未知校区"
 
         # 记录操作日志
         log = Log(
             operatorId=userId,
-            operation=f"更新套餐：{old_name} -> {data.get('name')}",
+            operation=f"更新套餐：{old_name} -> {data.get('name')}，校区：{old_school_name} -> {new_school_name}",
         )
         session.add(log)
 

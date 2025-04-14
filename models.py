@@ -334,6 +334,9 @@ class CourseCombo(Base):
     @property
     def showName(self):
         return self.name + " - " + str(format(self.price, '.2f')) + "元"
+    # 所属校区
+    schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
+    school = relationship("School", backref="combos")
     # 包含课程
     courseIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
     info = Column(Text, nullable=True)
@@ -344,9 +347,12 @@ class CourseCombo(Base):
             "name": self.name,
             "showName": self.showName,
             "price": self.price,
+            "schoolId": self.schoolId,
             "courseIds": self.courseIds,
             "info": self.info,
         }
+        if self.schoolId:
+            data["schoolName"] = self.school.name
         # 课程名列表
         if self.courseIds and len(self.courseIds) > 0:
             courses = [session.query(Course).get(courseId) for courseId in self.courseIds]
