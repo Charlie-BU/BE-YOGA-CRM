@@ -52,14 +52,17 @@ async def getClients(request):
             "message": "用户未登录"
         })
     data = request.json()
-    # 3为已转客户，4为已预约到店
-    clientStatus = data.get("clientStatus", 3)
+    # 3为已转客户，4为已预约到店，默认都有
+    clientStatus = data.get("clientStatus")
     page_index = data.get("pageIndex", 1)  # 当前页码，默认第一页
     page_size = data.get("pageSize", 10)  # 每页数量，默认10条
     offset = (int(page_index) - 1) * int(page_size)
-    name = data.get("name", "")
+    name = data.get("name")
     # 获取分页数据
-    query = session.query(Client).filter(Client.clientStatus == clientStatus).order_by(Client.createdTime.desc())
+    query = session.query(Client).filter(Client.clientStatus.in_([3, 4])).order_by(Client.clientStatus,
+                                                                                   Client.createdTime.desc())
+    if clientStatus:
+        query = query.filter(Client.clientStatus == clientStatus)
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
     clients = query.offset(offset).limit(page_size).all()
@@ -90,7 +93,8 @@ async def getDealedClients(request):
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
     # 获取分页数据
-    query = session.query(Client).filter(Client.processStatus == 2).order_by(Client.clientStatus, Client.createdTime.desc())
+    query = session.query(Client).filter(Client.processStatus == 2).order_by(Client.clientStatus,
+                                                                             Client.createdTime.desc())
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
     clients = query.offset(offset).limit(page_size).all()
@@ -557,89 +561,6 @@ async def cancelCooperation(request):
         })
 
 
-# 客户付款
-@extraRouter.post("/submitPayment")
-async def submitPayment(request):
-    sessionid = request.headers.get("sessionid")
-    userId = checkSessionid(sessionid).get("userId")
-    if not userId:
-        return jsonify({
-            "status": -1,
-            "message": "用户未登录"
-        })
-
-    data = request.json()
-    try:
-        # 创建支付记录
-        payment = Payment(
-            clientId=data.get("clientId"),
-            teacherId=data.get("teacherId"),
-            amount=data.get("amount"),
-            category=data.get("category"),  # 1为定金，2为尾款，3为其他
-            paymentMethod=data.get("paymentMethod"),
-            info=data.get("info")
-        )
-        session.add(payment)
-
-        # 记录操作日志
-        client = session.query(Client).get(data.get("clientId"))
-        teacher = session.query(User).get(data.get("teacherId"))
-        payType = "交定金" if data.get("category") == 1 else "交尾款" if data.get("category") == 2 else "付款"
-        log = Log(
-            operatorId=userId,
-            operation=f"客户：{client.name}{payType}{data.get('amount')}元，负责老师：{teacher.username}"
-        )
-        session.add(log)
-        session.commit()
-
-        return jsonify({
-            "status": 200,
-            "message": "付款成功"
-        })
-    except Exception as e:
-        session.rollback()
-        return jsonify({
-            "status": 500,
-            "message": f"付款失败：{str(e)}"
-        })
-
-
-# 获取客户付款记录
-@extraRouter.post("/getClientPayments")
-async def getClientPayments(request):
-    sessionid = request.headers.get("sessionid")
-    userId = checkSessionid(sessionid).get("userId")
-    if not userId:
-        return jsonify({
-            "status": -1,
-            "message": "用户未登录"
-        })
-
-    data = request.json()
-    client_id = data.get("clientId")
-
-    if not client_id:
-        return jsonify({
-            "status": 400,
-            "message": "缺少客户ID"
-        })
-
-    try:
-        # 获取该客户的所有交易记录
-        payments = session.query(Payment).filter(
-            Payment.clientId == client_id
-        ).order_by(Payment.paymentTime.desc()).all()
-        return jsonify({
-            "status": 200,
-            "payments": [Payment.to_json(payment) for payment in payments]
-        })
-    except Exception as e:
-        return jsonify({
-            "status": 500,
-            "message": f"获取交易记录失败：{str(e)}"
-        })
-
-
 # 批量导入线索
 @extraRouter.post("/batchImportClues")
 async def batchImportClues(request):
@@ -725,4 +646,257 @@ async def batchImportClues(request):
         return jsonify({
             "status": 500,
             "message": f"导入失败：{str(e)}"
+        })
+
+
+# 客户付款
+@extraRouter.post("/submitPayment")
+async def submitPayment(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    try:
+        # 创建支付记录
+        payment = Payment(
+            clientId=data.get("clientId"),
+            teacherId=data.get("teacherId"),
+            amount=data.get("amount"),
+            category=data.get("category"),  # 1为定金，2为尾款，3为其他
+            paymentMethod=data.get("paymentMethod"),
+            info=data.get("info")
+        )
+        session.add(payment)
+
+        # 记录操作日志
+        client = session.query(Client).get(data.get("clientId"))
+        teacher = session.query(User).get(data.get("teacherId"))
+        payType = "交定金" if data.get("category") == 1 else "交尾款" if data.get("category") == 2 else "付款"
+        log = Log(
+            operatorId=userId,
+            operation=f"客户：{client.name}{payType}{data.get('amount')}元，负责老师：{teacher.username}"
+        )
+        session.add(log)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "付款成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"付款失败：{str(e)}"
+        })
+
+
+# 获取客户付款记录
+@extraRouter.post("/getClientPayments")
+async def getClientPayments(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    client_id = data.get("clientId")
+
+    if not client_id:
+        return jsonify({
+            "status": 400,
+            "message": "缺少客户ID"
+        })
+
+    try:
+        # 获取该客户的所有交易记录
+        payments = session.query(Payment).filter(
+            Payment.clientId == client_id
+        ).order_by(Payment.paymentTime.desc()).all()
+        return jsonify({
+            "status": 200,
+            "payments": [Payment.to_json(payment) for payment in payments]
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取交易记录失败：{str(e)}"
+        })
+
+
+@extraRouter.post("/getPayments")
+async def getPayments(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    page_index = data.get("pageIndex", 1)
+    page_size = data.get("pageSize", 10)
+    isIncome = data.get("isIncome", "true")
+    try:
+        if isIncome == "true":
+            query = session.query(Payment).filter(Payment.amount > 0)
+        else:
+            query = session.query(Payment).filter(Payment.amount <= 0)
+        total = query.count()
+        payments = query.order_by(Payment.paymentTime.desc()).offset(
+            (int(page_index) - 1) * int(page_size)).limit(int(page_size)).all()
+
+        return jsonify({
+            "status": 200,
+            "payments": [Payment.to_json(payment) for payment in payments],
+            "total": total
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取交易记录失败：{str(e)}"
+        })
+
+
+@extraRouter.post("/addPayment")
+async def addPayment(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    amount = float(data.get("amount"))
+    if not amount or amount == 0:
+        return jsonify({
+            "status": -2,
+            "message": "金额不能等于0"
+        })
+    try:
+        payment = Payment()
+        payment.clientId = data.get("clientId") if data.get("clientId") != "null" else None
+        payment.receiver = data.get("receiver")
+        payment.teacherId = data.get("teacherId")
+        payment.amount = amount
+        payment.category = data.get("category")
+        payment.paymentMethod = data.get("paymentMethod")
+        payment.info = data.get("info")
+        payment.paymentTime = datetime.now()
+        payment.creatorId = userId
+
+        session.add(payment)
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "添加成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"添加失败：{str(e)}"
+        })
+
+
+@extraRouter.post("/updatePayment")
+async def updatePayment(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    payment_id = data.get("id")
+    if not payment_id:
+        return jsonify({
+            "status": 400,
+            "message": "缺少ID"
+        })
+    amount = float(data.get("amount"))
+    if not amount or amount == 0:
+        return jsonify({
+            "status": -2,
+            "message": "金额不能为0"
+        })
+    try:
+        payment = session.query(Payment).filter(Payment.id == payment_id).first()
+        if not payment:
+            return jsonify({
+                "status": 404,
+                "message": "记录不存在"
+            })
+
+        payment.clientId = data.get("clientId") if data.get("clientId") != "null" else None
+        payment.receiver = data.get("receiver")
+        payment.teacherId = data.get("teacherId")
+        payment.amount = amount
+        payment.category = data.get("category")
+        payment.paymentMethod = data.get("paymentMethod")
+        payment.info = data.get("info")
+
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "更新成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"更新失败：{str(e)}"
+        })
+
+
+@extraRouter.post("/deletePayment")
+async def deletePayment(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    payment_id = data.get("id")
+    if not payment_id:
+        return jsonify({
+            "status": 400,
+            "message": "缺少ID"
+        })
+
+    try:
+        payment = session.query(Payment).filter(Payment.id == payment_id).first()
+        if not payment:
+            return jsonify({
+                "status": 404,
+                "message": "记录不存在"
+            })
+
+        session.delete(payment)
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "删除成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"删除失败：{str(e)}"
         })

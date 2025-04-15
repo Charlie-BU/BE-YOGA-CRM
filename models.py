@@ -363,8 +363,11 @@ class CourseCombo(Base):
 class Payment(Base):
     __tablename__ = "payment"
     id = Column(Integer, primary_key=True, autoincrement=True)
+    # 客户：仅收入
     clientId = Column(Integer, ForeignKey("client.id"), nullable=True)
     client = relationship("Client", backref="payments")
+    # 收款方：仅支出
+    receiver = Column(Text, nullable=True)
     # 负责老师
     teacherId = Column(Integer, ForeignKey("user.id"), nullable=True)
     teacher = relationship("User", backref="payments")
@@ -382,6 +385,7 @@ class Payment(Base):
         data = {
             "id": self.id,
             "clientId": self.clientId,
+            "receiver": self.receiver,
             "teacherId": self.teacherId,
             "amount": self.amount,
             "category": self.category,
