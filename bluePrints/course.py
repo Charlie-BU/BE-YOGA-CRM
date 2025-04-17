@@ -502,3 +502,171 @@ async def getCourseClients(request):
             "status": 500,
             "message": f"查询失败：{str(e)}"
         })
+
+# 课程添加学员
+@courseRouter.post("/addStudent")
+async def addStudent(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    courseId = data.get("courseId")
+    studentId = data.get("studentId")
+
+    if not all([courseId, studentId]):
+        return jsonify({
+            "status": -2,
+            "message": "参数不完整"
+        })
+
+    try:
+        courseId = int(courseId)
+        studentId = int(studentId)
+        # 获取课程信息
+        course = session.query(Course).filter(Course.id == courseId).first()
+        if not course:
+            return jsonify({
+                "status": -3,
+                "message": "课程不存在"
+            })
+
+        # 获取学员信息
+        client = session.query(Client).filter(Client.id == studentId).first()
+        if not client:
+            return jsonify({
+                "status": -4,
+                "message": "学员不存在"
+            })
+
+        # 检查学员是否已经在课程中
+        if courseId in (client.courseIds or []):
+            return jsonify({
+                "status": -5,
+                "message": "该学员已在课程中"
+            })
+
+        # 添加课程ID到学员的课程列表中
+        if not client.courseIds:
+            client.courseIds = []
+        client.courseIds.append(courseId)
+
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "添加成功"
+        })
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"添加失败：{str(e)}"
+        })
+
+
+# 课程移除学员
+@courseRouter.post("/removeStudent")
+async def removeStudent(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    stuId = data.get("stuId")
+    courseId = data.get("courseId")
+
+    if not all([stuId, courseId]):
+        return jsonify({
+            "status": -2,
+            "message": "参数不完整"
+        })
+
+    try:
+        courseId = int(courseId)
+        # 获取学员信息
+        client = session.query(Client).filter(Client.id == stuId).first()
+        if not client:
+            return jsonify({
+                "status": -3,
+                "message": "学员不存在"
+            })
+
+        # 从学员的课程列表中移除该课程
+        if client.courseIds and courseId in client.courseIds:
+            client.courseIds.remove(courseId)
+            session.commit()
+            return jsonify({
+                "status": 200,
+                "message": "移除成功"
+            })
+        else:
+            return jsonify({
+                "status": -4,
+                "message": "该学员未参加此课程"
+            })
+
+    except Exception as e:
+        session.rollback()
+        print(f"移除学员失败: {str(e)}")
+        return jsonify({
+            "status": 500,
+            "message": f"移除失败：{str(e)}"
+        })
+
+
+# 编辑毕业人数
+@courseRouter.post("/updateGraduateNum")
+async def updateGraduateNum(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    courseId = data.get("id")
+    graduatedStuNumber = data.get("graduatedStuNumber")
+
+    if not all([courseId, graduatedStuNumber is not None]):
+        return jsonify({
+            "status": -2,
+            "message": "参数不完整"
+        })
+
+    try:
+        # 获取课程信息
+        course = session.query(Course).filter(Course.id == courseId).first()
+        if not course:
+            return jsonify({
+                "status": -3,
+                "message": "课程不存在"
+            })
+
+        # 更新毕业人数
+        course.graduatedStuNumber = graduatedStuNumber
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "更新成功"
+        })
+
+    except Exception as e:
+        session.rollback()
+        print(f"更新毕业人数失败: {str(e)}")
+        return jsonify({
+            "status": 500,
+            "message": f"更新失败：{str(e)}"
+        })

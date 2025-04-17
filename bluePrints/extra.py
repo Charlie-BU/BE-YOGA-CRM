@@ -9,6 +9,25 @@ from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthorit
 extraRouter = SubRouter(__file__, prefix="/extra")
 
 
+@extraRouter.post("/getClientById")
+async def getClientById(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    data = request.json()
+    clientId = data.get("clientId")
+    client = session.query(Client).get(clientId)
+    return jsonify({
+        "status": 200,
+        "message": "客户信息获取成功",
+        "client": client.to_json(),
+    })
+
+
 # 获取线索公海（不包括已转客户、已预约到店）
 @extraRouter.post("/getClueClients")
 async def getClueClients(request):
@@ -38,25 +57,6 @@ async def getClueClients(request):
         "message": "分页获取成功",
         "clients": clients,
         "total": total
-    })
-
-
-@extraRouter.post("/getClientById")
-async def getClientById(request):
-    sessionid = request.headers.get("sessionid")
-    userId = checkSessionid(sessionid).get("userId")
-    if not userId:
-        return jsonify({
-            "status": -1,
-            "message": "用户未登录"
-        })
-    data = request.json()
-    clientId = data.get("clientId")
-    client = session.query(Client).get(clientId)
-    return jsonify({
-        "status": 200,
-        "message": "客户信息获取成功",
-        "client": client.to_json(),
     })
 
 

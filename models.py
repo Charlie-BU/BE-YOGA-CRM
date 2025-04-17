@@ -262,6 +262,8 @@ class Course(Base):
     schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
     school = relationship("School", backref="courses")
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
+    # 毕业人数
+    graduatedStuNumber = Column(Integer, nullable=True, default=0)
     # 课时：周
     duration = Column(Float, nullable=True)
     price = Column(Float, nullable=True)
@@ -308,6 +310,7 @@ class Course(Base):
             "schoolId": self.schoolId,
             "creatorId": self.creatorId,
             "createdTime": self.createdTime,
+            "graduatedStuNumber": self.graduatedStuNumber,
             "duration": self.duration,
             "price": self.price,
             "chiefTeacherId": self.chiefTeacherId,
