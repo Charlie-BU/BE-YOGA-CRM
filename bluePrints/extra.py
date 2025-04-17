@@ -41,6 +41,25 @@ async def getClueClients(request):
     })
 
 
+@extraRouter.post("/getClientById")
+async def getClientById(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    data = request.json()
+    clientId = data.get("clientId")
+    client = session.query(Client).get(clientId)
+    return jsonify({
+        "status": 200,
+        "message": "客户信息获取成功",
+        "client": client.to_json(),
+    })
+
+
 # 获取已转客户、已预约到店
 @extraRouter.post("/getClients")
 async def getClients(request):
@@ -558,6 +577,102 @@ async def cancelCooperation(request):
         return jsonify({
             "status": 500,
             "message": f"取消成单失败：{str(e)}"
+        })
+
+
+# 学员毕业
+@extraRouter.post("/graduateClient")
+async def graduateClient(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    clientId = data.get("id")
+
+    try:
+        client = session.query(Client).get(clientId)
+        if not client:
+            return jsonify({
+                "status": -2,
+                "message": "客户不存在"
+            })
+
+        if client.clientStatus == 5:
+            return jsonify({
+                "status": -3,
+                "message": "该学员已毕业"
+            })
+
+        # 更新客户状态为已毕业
+        client.clientStatus = 5
+
+        # 记录操作日志
+        log = Log(operatorId=userId, operation=f"学员：{client.name}已毕业")
+        session.add(log)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "操作成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"操作失败：{str(e)}"
+        })
+
+
+# 取消毕业
+@extraRouter.post("/cancelGraduate")
+async def cancelGraduate(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    clientId = data.get("id")
+
+    try:
+        client = session.query(Client).get(clientId)
+        if not client:
+            return jsonify({
+                "status": -2,
+                "message": "客户不存在"
+            })
+
+        if client.clientStatus != 5:
+            return jsonify({
+                "status": -3,
+                "message": "客户不是毕业状态"
+            })
+
+        # 更新客户状态为已成单（从毕业状态恢复）
+        client.clientStatus = 4
+
+        # 记录操作日志
+        log = Log(operatorId=userId, operation=f"客户：{client.name}取消毕业")
+        session.add(log)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "操作成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"操作失败：{str(e)}"
         })
 
 

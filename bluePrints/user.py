@@ -98,12 +98,16 @@ async def register(request):
     gender = form["gender"]
     phone = form["phone"]
     address = form["address"]
-    department = form["department"]
+    departmentId = form["department"]
+    schoolId = None
+    if departmentId:
+        department = session.query(Department).get(departmentId)
+        schoolId = department.schoolId
     vocation = form["vocation"]
     status = form["status"]
     usertype = form["usertype"]
     password = form["password"]
-    user = User(username=username, gender=gender, phone=phone, address=address, departmentId=department,
+    user = User(username=username, gender=gender, phone=phone, address=address, departmentId=departmentId, schoolId=schoolId,
                 vocation=vocation, status=status, usertype=usertype, hashedPassword=User.hashPassword(password))
     log = Log(operatorId=userId, operation=f"添加用户：{username}")
     try:

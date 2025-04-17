@@ -2,6 +2,7 @@ import json
 import time
 
 from robyn import SubRouter, jsonify
+from sqlalchemy import func, text
 
 from models import *
 from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
@@ -151,8 +152,8 @@ async def updateCourse(request):
         })
 
     data = request.json()
-    course_id = data.get("id")
-    if not course_id:
+    courseId = data.get("id")
+    if not courseId:
         return jsonify({
             "status": 400,
             "message": "参数错误"
@@ -160,7 +161,7 @@ async def updateCourse(request):
 
     try:
         # 检查课程是否存在
-        course = session.query(Course).filter(Course.id == course_id).first()
+        course = session.query(Course).filter(Course.id == courseId).first()
         if not course:
             return jsonify({
                 "status": 404,
@@ -171,7 +172,7 @@ async def updateCourse(request):
         if data.get('name') and data['name'] != course.name:
             existing = session.query(Course).filter(
                 Course.name == data['name'],
-                Course.id != course_id
+                Course.id != courseId
             ).first()
             if existing:
                 return jsonify({
@@ -224,8 +225,8 @@ async def deleteCourse(request):
         })
 
     data = request.json()
-    course_id = data.get("id")
-    if not course_id:
+    courseId = data.get("id")
+    if not courseId:
         return jsonify({
             "status": 400,
             "message": "参数错误"
@@ -233,7 +234,7 @@ async def deleteCourse(request):
 
     try:
         # 检查课程是否存在
-        course = session.query(Course).filter(Course.id == course_id).first()
+        course = session.query(Course).filter(Course.id == courseId).first()
         if not course:
             return jsonify({
                 "status": 404,
@@ -448,4 +449,56 @@ async def deleteCombo(request):
         return jsonify({
             "status": 500,
             "message": f"删除套餐失败：{str(e)}"
+        })
+
+
+@courseRouter.post("/getCourseClients")
+async def getCourseClients(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    courseId = data.get("courseId")
+    if courseId is None:
+        return jsonify({
+            "status": -2,
+            "message": "缺少 courseId 参数"
+        })
+
+    try:
+        courseId = int(courseId)
+
+        # 使用数据库函数直接过滤，提高性能
+        clients_data = []
+        clientsCooperated = session.query(Client).filter(
+            Client.processStatus == 2  # 已成单
+        ).all()
+
+        for client in clientsCooperated:
+            # 检查课程ID是否在客户的课程列表中
+            if client.courseIds and courseId in client.courseIds:
+                clients_data.append({
+                    "id": client.id,
+                })
+        return jsonify({
+            "status": 200,
+            "message": "查询成功",
+            "total": len(clients_data),
+            "clients": clients_data
+        })
+    except ValueError:
+        return jsonify({
+            "status": 400,
+            "message": "课程ID格式错误"
+        })
+    except Exception as e:
+        print(f"获取课程学员失败: {str(e)}")
+        return jsonify({
+            "status": 500,
+            "message": f"查询失败：{str(e)}"
         })
