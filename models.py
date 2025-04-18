@@ -430,9 +430,12 @@ class Dormitory(Base):
             "name": self.name,
             "category": self.category,
             "schoolId": self.schoolId,
+            "roomCount": 0
         }
         if self.schoolId:
             data["schoolName"] = self.school.name
+        if self.rooms:
+            data["roomCount"] = len(self.rooms)
         return data
 
 
@@ -450,8 +453,8 @@ class Room(Base):
 
     # 公寓房间号或民房户号
     roomNumber = Column(Text, nullable=True)
-    building = Column(Text, nullable=True)  # 民房楼栋
-    unit = Column(Text, nullable=True)  # 民房户号
+    # 民房楼栋
+    building = Column(Text, nullable=True)
     maxBeds = Column(Integer, nullable=True, default=0)  # 统计用，最大床位数
 
     def to_json(self):
@@ -461,11 +464,17 @@ class Room(Base):
             "category": self.category,
             "roomNumber": self.roomNumber,
             "building": self.building,
-            "unit": self.unit,
             "maxBeds": self.maxBeds,
+            "occupiedBeds": 0
         }
         if self.dormitoryId:
             data["dormitory"] = self.dormitory.to_json()
+        if self.beds:
+            # 已住的床位数
+            # bool(bed.clients) 会把空列表变成 False，非空变成 True，加总起来就是非空床的数量。
+            # sum(True, True, False) => 2，因为 True 就是 1，False 是 0。
+            occupiedBeds = sum(bool(bed.clients) for bed in self.beds)
+            data["occupiedBeds"] = occupiedBeds
         return data
 
 
