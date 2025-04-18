@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import create_engine, ForeignKey, Boolean, Column, Integer, String, Text, DateTime, Date, Float, JSON
+from sqlalchemy import create_engine, ForeignKey, Boolean, Column, Integer, Text, DateTime, Date, Float, JSON
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy.ext.mutable import MutableList
 from bcrypt import hashpw, gensalt, checkpw
@@ -187,6 +187,11 @@ class Client(Base):
     cooperateTime = Column(DateTime, nullable=True)
     # 已学总课时：周
     learnedWeeks = Column(Float, nullable=True, default=0.0)
+    # 入住宿舍床
+    bedId = Column(Integer, ForeignKey("bed.id"), nullable=True)
+    bed = relationship("Bed", backref="clients")
+    # 入住时间
+    bedCheckInTime = Column(DateTime, nullable=True)
 
     def to_json(self):
         data = {
@@ -222,6 +227,8 @@ class Client(Base):
             "cooperateTime": self.cooperateTime,
             "contractNo": self.contractNo,
             "learnedWeeks": self.learnedWeeks,
+            "bedId": self.bedId,
+            "bedCheckInTime": self.bedCheckInTime,
         }
         if self.affiliatedUserId:
             data["affiliatedUserName"] = self.affiliatedUser.username
@@ -230,6 +237,8 @@ class Client(Base):
             if combo:
                 data["comboName"] = combo.showName
                 data["comboPrice"] = combo.price
+        if self.bedId:
+            data["bed"] = self.bed.to_json()
         return data
 
 
@@ -334,9 +343,11 @@ class CourseCombo(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, nullable=True)
     price = Column(Float, nullable=True)
+
     @property
     def showName(self):
         return self.name + " - " + str(format(self.price, '.2f')) + "元"
+
     # 所属校区
     schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
     school = relationship("School", backref="combos")
@@ -403,10 +414,90 @@ class Payment(Base):
         return data
 
 
+class Dormitory(Base):
+    __tablename__ = "dormitory"
+    id = Column(Integer, primary_key=True)
+    # 公寓名或小区名
+    name = Column(Text, nullable=True)
+    # 类别：1公寓 / 2民房
+    category = Column(Integer, nullable=True)
+    schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
+    school = relationship("School", backref="dormitories")
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "schoolId": self.schoolId,
+        }
+        if self.schoolId:
+            data["schoolName"] = self.school.name
+        return data
+
+
+class Room(Base):
+    __tablename__ = "room"
+    id = Column(Integer, primary_key=True)
+    dormitoryId = Column(Integer, ForeignKey("dormitory.id"), nullable=True)
+    dormitory = relationship("Dormitory", backref="rooms")
+
+    @property
+    def category(self):
+        if self.dormitory:
+            return self.dormitory.category
+        return 1
+
+    # 公寓房间号或民房户号
+    roomNumber = Column(Text, nullable=True)
+    building = Column(Text, nullable=True)  # 民房楼栋
+    unit = Column(Text, nullable=True)  # 民房户号
+    maxBeds = Column(Integer, nullable=True, default=0)  # 统计用，最大床位数
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "dormitoryId": self.dormitoryId,
+            "category": self.category,
+            "roomNumber": self.roomNumber,
+            "building": self.building,
+            "unit": self.unit,
+            "maxBeds": self.maxBeds,
+        }
+        if self.dormitoryId:
+            data["dormitory"] = self.dormitory.to_json()
+        return data
+
+
+class Bed(Base):
+    __tablename__ = "bed"
+    id = Column(Integer, primary_key=True)
+    roomId = Column(Integer, ForeignKey("room.id"), nullable=True)
+    room = relationship("Room", backref="beds")
+    # 床号
+    bedNumber = Column(Integer, nullable=True)
+    # 类型：1单人床 / 2上铺 / 3下铺
+    category = Column(Integer, nullable=True)
+    # 时间期限：周
+    duration = Column(Integer, nullable=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "roomId": self.roomId,
+            "bedNumber": self.bedNumber,
+            "category": self.category,
+            "duration": self.duration,
+        }
+        if self.roomId:
+            data["room"] = self.room.to_json()
+        return data
+
+
 class Log(Base):
     __tablename__ = "log"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    operatorId = Column(Integer, ForeignKey("user.id"), nullable=False)
+    operatorId = Column(Integer, ForeignKey("user.id"), nullable=True)
     operator = relationship("User", backref="logs")
     operation = Column(Text, nullable=True)
     time = Column(DateTime, default=datetime.now)
