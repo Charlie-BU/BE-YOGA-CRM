@@ -321,7 +321,7 @@ async def assignClients(request):
 
     try:
         # 获取被分配的用户信息
-        assigned_user = session.query(User).filter(User.id == assigned_user_id).first()
+        assigned_user = session.query(User).get(assigned_user_id)
         if not assigned_user:
             return jsonify({
                 "status": 404,

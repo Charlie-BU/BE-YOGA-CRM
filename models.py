@@ -156,11 +156,12 @@ class Client(Base):
     # 所在校区
     @property
     def schoolName(self):
+        if self.affiliatedUser:
+            return self.affiliatedUser.school.name
         appointer = session.query(User).get(self.appointerId)
         if appointer and appointer.schoolId:
             return appointer.school.name
-        else:
-            return ""
+        return ""
 
     # 课程（多个）
     courseIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
@@ -191,7 +192,7 @@ class Client(Base):
     bedId = Column(Integer, ForeignKey("bed.id"), nullable=True)
     bed = relationship("Bed", backref="clients")
     # 入住时间
-    bedCheckInTime = Column(DateTime, nullable=True)
+    bedCheckInDate = Column(Date, nullable=True)
 
     def to_json(self):
         data = {
@@ -228,7 +229,7 @@ class Client(Base):
             "contractNo": self.contractNo,
             "learnedWeeks": self.learnedWeeks,
             "bedId": self.bedId,
-            "bedCheckInTime": self.bedCheckInTime,
+            "bedCheckInDate": self.bedCheckInDate,
         }
         if self.affiliatedUserId:
             data["affiliatedUserName"] = self.affiliatedUser.username
@@ -237,8 +238,9 @@ class Client(Base):
             if combo:
                 data["comboName"] = combo.showName
                 data["comboPrice"] = combo.price
-        if self.bedId:
-            data["bed"] = self.bed.to_json()
+        # 数据过大了
+        # if self.bedId:
+        #     data["bed"] = self.bed.to_json()
         return data
 
 
@@ -457,6 +459,15 @@ class Room(Base):
     building = Column(Text, nullable=True)
     maxBeds = Column(Integer, nullable=True, default=0)  # 统计用，最大床位数
 
+    # 已住的床位数
+    # bool(bed.clients) 会把空列表变成 False，非空变成 True，加总起来就是非空床的数量。
+    # sum(True, True, False) => 2，因为 True 就是 1，False 是 0。
+    @property
+    def occupiedBeds(self):
+        if self.beds:
+            return sum(bool(bed.clients) for bed in self.beds)
+        return 0
+
     def to_json(self):
         data = {
             "id": self.id,
@@ -465,16 +476,10 @@ class Room(Base):
             "roomNumber": self.roomNumber,
             "building": self.building,
             "maxBeds": self.maxBeds,
-            "occupiedBeds": 0
+            "occupiedBeds": self.occupiedBeds,
         }
-        if self.dormitoryId:
-            data["dormitory"] = self.dormitory.to_json()
-        if self.beds:
-            # 已住的床位数
-            # bool(bed.clients) 会把空列表变成 False，非空变成 True，加总起来就是非空床的数量。
-            # sum(True, True, False) => 2，因为 True 就是 1，False 是 0。
-            occupiedBeds = sum(bool(bed.clients) for bed in self.beds)
-            data["occupiedBeds"] = occupiedBeds
+        # if self.dormitoryId:
+        #     data["dormitory"] = self.dormitory.to_json()
         return data
 
 
@@ -490,6 +495,10 @@ class Bed(Base):
     # 时间期限：周
     duration = Column(Integer, nullable=True)
 
+    @property
+    def isVacant(self):
+        return not self.clients
+
     def to_json(self):
         data = {
             "id": self.id,
@@ -497,9 +506,16 @@ class Bed(Base):
             "bedNumber": self.bedNumber,
             "category": self.category,
             "duration": self.duration,
+            "isVacant": self.isVacant,
+            "studentId": None,
+            "studentName": None,
         }
-        if self.roomId:
-            data["room"] = self.room.to_json()
+        # if self.roomId:
+        #     data["room"] = self.room.to_json()
+        if self.clients:
+            data["studentId"] = self.clients[-1].id
+            data["studentName"] = self.clients[-1].name
+            data["bedCheckInDate"] = self.clients[-1].bedCheckInDate
         return data
 
 

@@ -11,6 +11,49 @@ dormRouter = SubRouter(__file__, prefix="/dorm")
 
 
 # 公寓相关
+@dormRouter.post("/getDormInfoByBedId")
+async def getDormInfoByBedId(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    bed_id = data.get("bedId")
+
+    try:
+        # 获取床位信息，包括关联的房间和公寓信息
+        bed = session.query(Bed).get(bed_id)
+        if not bed:
+            return jsonify({
+                "status": 404,
+                "message": "床位不存在"
+            })
+
+        room = session.query(Room).get(bed.roomId)
+        if not room:
+            return jsonify({
+                "status": 404,
+                "message": "房间不存在"
+            })
+        dormitory = session.query(Dormitory).get(room.dormitoryId)
+
+        return jsonify({
+            "status": 200,
+            "dorm": dormitory.to_json(),
+            "room": room.to_json(),
+            "bed": bed.to_json()
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取住宿信息失败：{str(e)}"
+        })
+
+
 @dormRouter.post("/getDormitories")
 async def getDormitories(request):
     sessionid = request.headers.get("sessionid")
@@ -314,10 +357,11 @@ async def deleteRoom(request):
         session.rollback()
         return jsonify({
             "status": 500,
-            "message": f"删除房间失败：{str(e)}"
+            "message": f"当前房间存在床位有人入住，无法删除"
         })
 
-# TODO：床位相关
+
+# 床位相关
 @dormRouter.post("/getBeds")
 async def getBeds(request):
     sessionid = request.headers.get("sessionid")
@@ -334,30 +378,9 @@ async def getBeds(request):
     try:
         # 获取指定房间的所有床位
         beds = session.query(Bed).filter(Bed.roomId == roomId).all()
-
-        result_beds = []
-        for bed in beds:
-            # 获取学生信息
-            student_name = None
-            if bed.studentId:
-                student = session.query(Student).filter(Student.id == bed.studentId).first()
-                if student:
-                    student_name = student.name
-
-            bed_json = {
-                "id": bed.id,
-                "roomId": bed.roomId,
-                "bedNumber": bed.bedNumber,
-                "category": bed.category,
-                "duration": bed.duration,
-                "studentId": bed.studentId,
-                "studentName": student_name
-            }
-            result_beds.append(bed_json)
-
         return jsonify({
             "status": 200,
-            "beds": result_beds
+            "beds": [bed.to_json() for bed in beds]
         })
     except Exception as e:
         return jsonify({
@@ -383,6 +406,17 @@ async def addBed(request):
     duration = data.get("duration")
 
     try:
+        room = session.query(Room).get(roomId)
+        if not room:
+            return jsonify({
+                "status": 404,
+                "message": "房间不存在"
+            })
+        if room.beds and len(room.beds) >= room.maxBeds:
+            return jsonify({
+                "status": -2,
+                "message": "当前房间床位数已达最大床位数"
+            })
         # 创建新床位
         new_bed = Bed(
             roomId=roomId,
@@ -462,8 +496,21 @@ async def deleteBed(request):
     bed_id = data.get("id")
 
     try:
+        bed = session.query(Bed).get(bed_id)
+        if not bed:
+            return jsonify({
+                "status": 404,
+                "message": "床位不存在"
+            })
+        if bed.clients:
+            return jsonify({
+                "status": -2,
+                "message": "当前房间有人入住，无法删除"
+            })
         # 删除床位
-        session.query(Bed).filter(Bed.id == bed_id).delete()
+        session.delete(bed)
+        log = Log(operatorId=userId, operation="删除床位")
+        session.add(log)
         session.commit()
 
         return jsonify({
@@ -476,6 +523,44 @@ async def deleteBed(request):
             "status": 500,
             "message": f"删除床位失败：{str(e)}"
         })
+
+
+# 获取未入住的成单客户
+@dormRouter.post("/getUncheckedDealedClients")
+async def getUncheckedDealedClients(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    data = request.json()
+    page_index = data.get("pageIndex", 1)  # 当前页码，默认第一页
+    page_size = data.get("pageSize", 10)  # 每页数量，默认10条
+    offset = (int(page_index) - 1) * int(page_size)
+    name = data.get("name", "")
+    # 获取分页数据
+    query = session.query(Client).filter(
+        Client.processStatus == 2,
+        Client.bedId.is_(None)
+    ).order_by(
+        Client.clientStatus,
+        Client.createdTime.desc()
+    )
+
+    if name:
+        query = query.filter(Client.name.like(f"%{name}%"))
+    clients = query.offset(offset).limit(page_size).all()
+    clients = [Client.to_json(client) for client in clients]
+    # 获取总数
+    total = query.count()
+    return jsonify({
+        "status": 200,
+        "message": "分页获取成功",
+        "clients": clients,
+        "total": total
+    })
 
 
 @dormRouter.post("/assignBed")
@@ -494,23 +579,24 @@ async def assignBed(request):
 
     try:
         bed = session.query(Bed).filter(Bed.id == bed_id).first()
-        if not bed:
+        if not bed or not student_id:
             return jsonify({
                 "status": 404,
-                "message": "床位不存在"
+                "message": "参数错误"
             })
 
-        # 检查学生是否存在
-        if student_id:
-            student = session.query(Student).filter(Student.id == student_id).first()
-            if not student:
-                return jsonify({
-                    "status": 404,
-                    "message": "学生不存在"
-                })
+        student = session.query(Client).get(student_id)
+        if not student:
+            return jsonify({
+                "status": 404,
+                "message": "学生不存在"
+            })
 
         # 分配床位
-        bed.studentId = student_id
+        student.bedId = bed_id
+        student.bedCheckInDate = datetime.now().date()
+        log = Log(operatorId=userId, operation=f"学员：{student.name}入住")
+        session.add(log)
         session.commit()
 
         return jsonify({
@@ -522,4 +608,58 @@ async def assignBed(request):
         return jsonify({
             "status": 500,
             "message": f"床位分配失败：{str(e)}"
+        })
+
+
+@dormRouter.post("/checkOut")
+async def checkOut(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    bed_id = data.get("bedId")
+
+    try:
+        # 获取床位信息
+        bed = session.query(Bed).filter(Bed.id == bed_id).first()
+        if not bed:
+            return jsonify({
+                "status": 404,
+                "message": "床位不存在"
+            })
+
+        # 获取当前入住的学员信息
+        student = session.query(Client).filter(Client.bedId == bed_id).first()
+        if not student:
+            return jsonify({
+                "status": 404,
+                "message": "该床位没有入住学员"
+            })
+
+        # 记录学员姓名用于日志
+        student_name = student.name
+
+        # 清除学员的床位信息
+        student.bedId = None
+        student.bedCheckInDate = None
+
+        # 添加操作日志
+        log = Log(operatorId=userId, operation=f"学员：{student_name}离住")
+        session.add(log)
+
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "离住成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"离住失败：{str(e)}"
         })
