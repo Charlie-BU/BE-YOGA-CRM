@@ -48,6 +48,7 @@ async def getDormInfoByBedId(request):
             "bed": bed.to_json()
         })
     except Exception as e:
+        session.rollback()
         return jsonify({
             "status": 500,
             "message": f"获取住宿信息失败：{str(e)}"
@@ -91,7 +92,7 @@ async def getDormitories(request):
             "total": total
         })
     except Exception as e:
-        print("错误！！！", e)
+        session.rollback()
         return jsonify({
             "status": 500,
             "message": f"获取公寓列表失败：{str(e)}"
@@ -240,6 +241,7 @@ async def getRooms(request):
             "rooms": [room.to_json() for room in rooms]
         })
     except Exception as e:
+        session.rollback()
         return jsonify({
             "status": 500,
             "message": f"获取房间列表失败：{str(e)}"
@@ -383,6 +385,7 @@ async def getBeds(request):
             "beds": [bed.to_json() for bed in beds]
         })
     except Exception as e:
+        session.rollback()
         return jsonify({
             "status": 500,
             "message": f"获取床位列表失败：{str(e)}"
@@ -540,27 +543,34 @@ async def getUncheckedDealedClients(request):
     page_size = data.get("pageSize", 10)  # 每页数量，默认10条
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
-    # 获取分页数据
-    query = session.query(Client).filter(
-        Client.processStatus == 2,
-        Client.bedId.is_(None)
-    ).order_by(
-        Client.clientStatus,
-        Client.createdTime.desc()
-    )
+    try:
+        # 获取分页数据
+        query = session.query(Client).filter(
+            Client.processStatus == 2,
+            Client.bedId.is_(None)
+        ).order_by(
+            Client.clientStatus,
+            Client.createdTime.desc()
+        )
 
-    if name:
-        query = query.filter(Client.name.like(f"%{name}%"))
-    clients = query.offset(offset).limit(page_size).all()
-    clients = [Client.to_json(client) for client in clients]
-    # 获取总数
-    total = query.count()
-    return jsonify({
-        "status": 200,
-        "message": "分页获取成功",
-        "clients": clients,
-        "total": total
-    })
+        if name:
+            query = query.filter(Client.name.like(f"%{name}%"))
+        clients = query.offset(offset).limit(page_size).all()
+        clients = [Client.to_json(client) for client in clients]
+        # 获取总数
+        total = query.count()
+        return jsonify({
+            "status": 200,
+            "message": "分页获取成功",
+            "clients": clients,
+            "total": total
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "错误"
+        })
 
 
 @dormRouter.post("/assignBed")

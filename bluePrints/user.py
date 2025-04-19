@@ -13,32 +13,37 @@ userRouter = SubRouter(__file__, prefix="/user")
 async def login(request):
     data = request.json()
     username = data["username"]
-    user = session.query(User).filter(User.username == username).first()
-    if not user:
-        return jsonify({
-            "status": -1,
-            "message": "用户不存在",
-        })
-    password = data["password"]
-    if not user.checkPassword(password):
-        return jsonify({
-            "status": -2,
-            "message": "密码错误"
-        })
-    signature = calcSignature(user.id)
-    rawSessionid = f"userId={user.id}&timestamp={int(time.time())}&signature={signature}&algorithm=sha256"
-    sessionid = encode(rawSessionid)
-    log = Log(operatorId=user.id, operation="用户登录")
     try:
+        user = session.query(User).filter(User.username == username).first()
+        if not user:
+            return jsonify({
+                "status": -1,
+                "message": "用户不存在",
+            })
+        password = data["password"]
+        if not user.checkPassword(password):
+            return jsonify({
+                "status": -2,
+                "message": "密码错误"
+            })
+        signature = calcSignature(user.id)
+        rawSessionid = f"userId={user.id}&timestamp={int(time.time())}&signature={signature}&algorithm=sha256"
+        sessionid = encode(rawSessionid)
+        log = Log(operatorId=user.id, operation="用户登录")
+
         session.add(log)
         session.commit()
-    except Exception:
+        return jsonify({
+            "status": 200,
+            "message": "登录成功",
+            "sessionid": sessionid,
+        })
+    except Exception as e:
         session.rollback()
-    return jsonify({
-        "status": 200,
-        "message": "登录成功",
-        "sessionid": sessionid,
-    })
+        return jsonify({
+            "status": 500,
+            "message": "错误"
+        })
 
 
 @userRouter.post("/loginCheck")
@@ -67,20 +72,31 @@ async def loginCheck(request):
                 "usertype": user.usertype,
             }
         })
-    except Exception:
+    except Exception as e:
         session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "错误"
+        })
 
 
 @userRouter.post("/getUserInfo")
 async def getUserInfo(request):
     sessionid = request.headers["sessionid"]
     userId = checkSessionid(sessionid).get("userId")
-    user = session.query(User).get(userId)
-    return jsonify({
-        "status": 200,
-        "message": "用户信息获取成功",
-        "user": User.to_json(user)
-    })
+    try:
+        user = session.query(User).get(userId)
+        return jsonify({
+            "status": 200,
+            "message": "用户信息获取成功",
+            "user": User.to_json(user)
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "错误"
+        })
 
 
 @userRouter.post("/register")
@@ -107,51 +123,60 @@ async def register(request):
     status = form["status"]
     usertype = form["usertype"]
     password = form["password"]
-    user = User(username=username, gender=gender, phone=phone, address=address, departmentId=departmentId, schoolId=schoolId,
+    user = User(username=username, gender=gender, phone=phone, address=address, departmentId=departmentId,
+                schoolId=schoolId,
                 vocation=vocation, status=status, usertype=usertype, hashedPassword=User.hashPassword(password))
     log = Log(operatorId=userId, operation=f"添加用户：{username}")
     try:
         session.add(user)
         session.add(log)
         session.commit()
-    except Exception:
+        return jsonify({
+            "status": 200,
+            "message": "用户添加成功"
+        })
+    except Exception as e:
         session.rollback()
-    return jsonify({
-        "status": 200,
-        "message": "用户添加成功"
-    })
+        return jsonify({
+            "status": 500,
+            "message": "错误"
+        })
 
 
 @userRouter.post("/modifyPwd")
 async def modifyPwd(request):
     sessionid = request.headers["sessionid"]
     userId = checkSessionid(sessionid).get("userId")
-    user = session.query(User).get(userId)
-    if not user:
-        return jsonify({
-            "status": -1,
-            "message": "用户未登录"
-        })
-    form = request.json()["form"]
-    form = json.loads(form)
-    oldPwd = form["oldPwd"]
-    if not user.checkPassword(oldPwd):
-        return jsonify({
-            "status": -2,
-            "message": "旧密码输入错误"
-        })
-    newPwd = form["newPwd"]
-    user.hashedPassword = User.hashPassword(newPwd)
-    log = Log(operatorId=user.id, operation="修改密码")
     try:
+        user = session.query(User).get(userId)
+        if not user:
+            return jsonify({
+                "status": -1,
+                "message": "用户未登录"
+            })
+        form = request.json()["form"]
+        form = json.loads(form)
+        oldPwd = form["oldPwd"]
+        if not user.checkPassword(oldPwd):
+            return jsonify({
+                "status": -2,
+                "message": "旧密码输入错误"
+            })
+        newPwd = form["newPwd"]
+        user.hashedPassword = User.hashPassword(newPwd)
+        log = Log(operatorId=user.id, operation="修改密码")
         session.add(log)
         session.commit()
-    except Exception:
+        return jsonify({
+            "status": 200,
+            "message": "密码修改成功"
+        })
+    except Exception as e:
         session.rollback()
-    return jsonify({
-        "status": 200,
-        "message": "密码修改成功"
-    })
+        return jsonify({
+            "status": 500,
+            "message": "错误"
+        })
 
 
 @userRouter.post("/getAllUsers")
@@ -230,7 +255,7 @@ async def updateUser(request):
             if hasattr(user, key):
                 try:
                     setattr(user, key, value)
-                except Exception:
+                except Exception as e:
                     continue
 
         # 记录操作日志
