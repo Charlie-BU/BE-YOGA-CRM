@@ -382,11 +382,32 @@ class Payment(Base):
     # 客户：仅收入
     clientId = Column(Integer, ForeignKey("client.id"), nullable=True)
     client = relationship("Client", backref="payments")
+    @property
+    def clientName(self):
+        if self.clientId:
+            return self.client.name
+        return ""
+    @property
+    def clientPhone(self):
+        if self.clientId:
+            return self.client.phone
+        return ""
     # 收款方：仅支出
     receiver = Column(Text, nullable=True)
     # 负责老师
     teacherId = Column(Integer, ForeignKey("user.id"), nullable=True)
     teacher = relationship("User", backref="payments")
+    # 所属校区（取决于负责老师）
+    @property
+    def schoolId(self):
+        if self.teacherId:
+            return self.teacher.schoolId
+        return None
+    @property
+    def schoolName(self):
+        if self.teacherId:
+            return self.teacher.school.name
+        return ""
     # 金额：单位元，正为收入，负为支出
     amount = Column(Integer, nullable=True)
     # 类别：1定金 / 2尾款 / 3住宿费 / 4补差价 / 5其他
@@ -401,6 +422,8 @@ class Payment(Base):
         data = {
             "id": self.id,
             "clientId": self.clientId,
+            "clientName": self.clientName,
+            "clientPhone": self.clientPhone,
             "receiver": self.receiver,
             "teacherId": self.teacherId,
             "amount": self.amount,
@@ -408,9 +431,9 @@ class Payment(Base):
             "paymentMethod": self.paymentMethod,
             "info": self.info,
             "paymentTime": self.paymentTime,
+            "schoolId": self.schoolId,
+            "schoolName": self.schoolName,
         }
-        if self.clientId:
-            data["clientName"] = self.client.name
         if self.teacherId:
             data["teacherName"] = self.teacher.username
         return data

@@ -2,6 +2,7 @@ import json
 import time
 
 from robyn import SubRouter, jsonify
+from sqlalchemy import or_
 
 from models import *
 from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
@@ -860,12 +861,45 @@ async def getPayments(request):
     data = request.json()
     page_index = data.get("pageIndex", 1)
     page_size = data.get("pageSize", 10)
-    isIncome = data.get("isIncome", "true")
+    paymentType = data.get("paymentType", "all")
+
     try:
-        if isIncome == "true":
-            query = session.query(Payment).filter(Payment.amount > 0)
-        else:
-            query = session.query(Payment).filter(Payment.amount <= 0)
+        query = session.query(Payment)
+
+        # 添加筛选条件
+        if data.get("schoolId"):
+            query = query.filter(Payment.schoolId == data["schoolId"])
+        if paymentType == "income":
+            query = query.filter(Payment.amount > 0)
+        elif paymentType == "expense":
+            query = query.filter(Payment.amount <= 0)
+
+        if data.get("category"):
+            query = query.filter(Payment.category == data["category"])
+
+        if data.get("paymentMethod"):
+            query = query.filter(Payment.paymentMethod == data["paymentMethod"])
+
+        if data.get("clientName"):
+            # 必须用outerjoin，否则默认innerjoin，当没有Payment.client但存在Payment.receiver时无法找到
+            query = query.outerjoin(Payment.client).filter(
+                or_(
+                    Client.name.contains(data["clientName"]),
+                    Payment.receiver.contains(data["clientName"])
+                )
+            )
+
+        if data.get("clientPhone"):
+            query = query.join(Payment.client).filter(
+                Client.phone.contains(data["clientPhone"])
+            )
+
+        if data.get("startTime"):
+            query = query.filter(Payment.paymentTime >= data["startTime"])
+
+        if data.get("endTime"):
+            query = query.filter(Payment.paymentTime <= data["endTime"])
+
         total = query.count()
         payments = query.order_by(Payment.paymentTime.desc()).offset(
             (int(page_index) - 1) * int(page_size)).limit(int(page_size)).all()
@@ -876,6 +910,7 @@ async def getPayments(request):
             "total": total
         })
     except Exception as e:
+        print(e)
         return jsonify({
             "status": 500,
             "message": f"获取交易记录失败：{str(e)}"
