@@ -39,20 +39,54 @@ async def getClueClients(request):
             "status": -1,
             "message": "用户未登录"
         })
+
     data = request.json()
-    page_index = data.get("pageIndex", 1)  # 当前页码，默认第一页
-    page_size = data.get("pageSize", 10)  # 每页数量，默认10条
+    page_index = data.get("pageIndex", 1)
+    page_size = data.get("pageSize", 10)
     offset = (int(page_index) - 1) * int(page_size)
-    name = data.get("name", "")
+
+    # 构建查询
+    query = session.query(Client).order_by(Client.clientStatus, Client.createdTime.desc())
+
+    # 添加筛选条件
+    if data.get("name"):
+        query = query.filter(Client.name.like(f"%{data['name']}%"))
+    if data.get("fromSource"):
+        query = query.filter(Client.fromSource == data["fromSource"])
+    if data.get("gender"):
+        query = query.filter(Client.gender == data["gender"])
+    if data.get("age"):
+        query = query.filter(Client.age == data["age"])
+    if data.get("IDNumber"):
+        query = query.filter(Client.IDNumber.like(f"%{data['IDNumber']}%"))
+    if data.get("phone"):
+        query = query.filter(Client.phone.like(f"%{data['phone']}%"))
+    if data.get("weixin"):
+        query = query.filter(Client.weixin.like(f"%{data['weixin']}%"))
+    if data.get("QQ"):
+        query = query.filter(Client.QQ.like(f"%{data['QQ']}%"))
+    if data.get("douyin"):
+        query = query.filter(Client.douyin.like(f"%{data['douyin']}%"))
+    if data.get("rednote"):
+        query = query.filter(Client.rednote.like(f"%{data['rednote']}%"))
+    if data.get("shangwutong"):
+        query = query.filter(Client.shangwutong.like(f"%{data['shangwutong']}%"))
+    if data.get("address"):
+        query = query.filter(Client.address.like(f"%{data['address']}%"))
+    if data.get("clientStatus"):
+        query = query.filter(Client.clientStatus == data["clientStatus"])
+    if data.get("startTime"):
+        query = query.filter(Client.createdTime >= data["startTime"])
+    if data.get("endTime"):
+        query = query.filter(Client.createdTime <= data["endTime"])
+
     # 获取分页数据
-    # query = session.query(Client).filter(Client.clientStatus.in_([1, 2]))
-    query = session.query(Client).order_by(Client.clientStatus, Client.createdTime.desc())  # 定为全部客户
-    if name:
-        query = query.filter(Client.name.like(f"%{name}%"))
     clients = query.offset(offset).limit(page_size).all()
     clients = [Client.to_json(client) for client in clients]
+
     # 获取总数
     total = query.count()
+
     return jsonify({
         "status": 200,
         "message": "分页获取成功",
@@ -71,24 +105,66 @@ async def getClients(request):
             "status": -1,
             "message": "用户未登录"
         })
+
     data = request.json()
-    # 3为已转客户，4为已预约到店，默认都有
     clientStatus = data.get("clientStatus")
-    page_index = data.get("pageIndex", 1)  # 当前页码，默认第一页
-    page_size = data.get("pageSize", 10)  # 每页数量，默认10条
+    page_index = data.get("pageIndex", 1)
+    page_size = data.get("pageSize", 10)
     offset = (int(page_index) - 1) * int(page_size)
-    name = data.get("name")
-    # 获取分页数据
+
+    # 基础查询
     query = session.query(Client).filter(Client.clientStatus.in_([3, 4])).order_by(Client.clientStatus,
                                                                                    Client.createdTime.desc())
+
+    # 添加筛选条件
+    filters = {
+        'name': lambda x: Client.name.like(f"%{x}%"),
+        'fromSource': lambda x: Client.fromSource == x,
+        'gender': lambda x: Client.gender == x,
+        'age': lambda x: Client.age == x,
+        'IDNumber': lambda x: Client.IDNumber.like(f"%{x}%"),
+        'phone': lambda x: Client.phone.like(f"%{x}%"),
+        'weixin': lambda x: Client.weixin.like(f"%{x}%"),
+        'QQ': lambda x: Client.QQ.like(f"%{x}%"),
+        'douyin': lambda x: Client.douyin.like(f"%{x}%"),
+        'rednote': lambda x: Client.rednote.like(f"%{x}%"),
+        'shangwutong': lambda x: Client.shangwutong.like(f"%{x}%"),
+        'address': lambda x: Client.address.like(f"%{x}%"),
+        'appointerId': lambda x: Client.appointerId == x,
+        'affiliatedUserName': lambda x: Client.affiliatedUser.username.like(f"%{x}%"),
+        # 'appointerName': lambda x: Client.appointerName.like(f"%{x}%"),
+        'processStatus': lambda x: Client.processStatus == x,
+    }
+
+    # 处理校区：由于schoolId是@property属性，不是SQL字段，直接filter不执行
+    if data.get("schoolId"):
+        query = query.outerjoin(Client.affiliatedUser).filter(User.schoolId == data["schoolId"])
+
+    # 处理日期范围筛选
+    if data.get('startTime') and data.get('endTime'):
+        query = query.filter(Client.createdTime.between(data['startTime'], data['endTime']))
+
+    if data.get('appointStartDate') and data.get('appointEndDate'):
+        query = query.filter(Client.appointDate.between(data['appointStartDate'], data['appointEndDate']))
+
+    if data.get('nextTalkStartDate') and data.get('nextTalkEndDate'):
+        query = query.filter(Client.nextTalkDate.between(data['nextTalkStartDate'], data['nextTalkEndDate']))
+
+    # 应用其他筛选条件
+    for field, filter_func in filters.items():
+        if data.get(field):
+            query = query.filter(filter_func(data[field]))
+
     if clientStatus:
         query = query.filter(Client.clientStatus == clientStatus)
-    if name:
-        query = query.filter(Client.name.like(f"%{name}%"))
+
+    # 获取分页数据
     clients = query.offset(offset).limit(page_size).all()
     clients = [Client.to_json(client) for client in clients]
+
     # 获取总数
     total = query.count()
+
     return jsonify({
         "status": 200,
         "message": "分页获取成功",

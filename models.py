@@ -155,6 +155,14 @@ class Client(Base):
 
     # 所在校区
     @property
+    def schoolId(self):
+        if self.affiliatedUser:
+            return self.affiliatedUser.schoolId
+        appointer = session.query(User).get(self.appointerId)
+        if appointer and appointer.schoolId:
+            return appointer.schoolId
+        return None
+    @property
     def schoolName(self):
         if self.affiliatedUser:
             return self.affiliatedUser.school.name
@@ -218,6 +226,7 @@ class Client(Base):
             "detailedInfo": self.detailedInfo,
             "appointerId": self.appointerId,
             "appointerName": self.appointerName,
+            "schoolId": self.schoolId,
             "schoolName": self.schoolName,
             "courseIds": self.courseIds,
             "courseNames": self.courseNames,
