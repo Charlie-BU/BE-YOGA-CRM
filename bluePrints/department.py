@@ -132,9 +132,9 @@ async def addDept(request):
     data = request.json()
     name = data.get("name")
     info = data.get("info", "")
-    school_id = data.get("schoolId")  # 添加校区ID
+    schoolId = data.get("schoolId")  # 添加校区ID
 
-    if not name or not school_id:  # 检查必填字段
+    if not name or not schoolId:  # 检查必填字段
         return jsonify({
             "status": 400,
             "message": "部门名称和所属校区不能为空"
@@ -142,7 +142,7 @@ async def addDept(request):
 
     try:
         # 检查校区是否存在
-        school = session.query(School).filter(School.id == school_id).first()
+        school = session.query(School).filter(School.id == schoolId).first()
         if not school:
             return jsonify({
                 "status": 400,
@@ -161,7 +161,7 @@ async def addDept(request):
         new_dept = Department(
             name=name,
             info=info,
-            schoolId=school_id  # 添加校区ID
+            schoolId=schoolId  # 添加校区ID
         )
         session.add(new_dept)
         session.commit()
@@ -192,9 +192,9 @@ async def updateDept(request):
     dept_id = data.get("id")
     name = data.get("name")
     info = data.get("info", "")
-    school_id = data.get("schoolId")  # 添加校区ID
+    schoolId = data.get("schoolId")  # 添加校区ID
 
-    if not dept_id or not name or not school_id:  # 检查必填字段
+    if not dept_id or not name or not schoolId:  # 检查必填字段
         return jsonify({
             "status": 400,
             "message": "参数错误"
@@ -210,7 +210,7 @@ async def updateDept(request):
             })
 
         # 检查校区是否存在
-        school = session.query(School).filter(School.id == school_id).first()
+        school = session.query(School).filter(School.id == schoolId).first()
         if not school:
             return jsonify({
                 "status": 400,
@@ -231,7 +231,7 @@ async def updateDept(request):
         # 更新部门信息
         dept.name = name
         dept.info = info
-        dept.schoolId = school_id  # 添加校区ID
+        dept.schoolId = schoolId  # 添加校区ID
         session.commit()
 
         return jsonify({
@@ -360,12 +360,12 @@ async def updateSchool(request):
         })
 
     data = request.json()
-    school_id = data.get("id")
+    schoolId = data.get("id")
     name = data.get("name")
     address = data.get("address")
     info = data.get("info", "")
 
-    if not school_id or not name or not address:
+    if not schoolId or not name or not address:
         return jsonify({
             "status": 400,
             "message": "参数错误"
@@ -373,7 +373,7 @@ async def updateSchool(request):
 
     try:
         # 检查校区是否存在
-        school = session.query(School).filter(School.id == school_id).first()
+        school = session.query(School).filter(School.id == schoolId).first()
         if not school:
             return jsonify({
                 "status": 404,
@@ -383,7 +383,7 @@ async def updateSchool(request):
         # 检查新名称是否与其他校区重复
         existing = session.query(School).filter(
             School.name == name,
-            School.id != school_id
+            School.id != schoolId
         ).first()
         if existing:
             return jsonify({
@@ -420,9 +420,9 @@ async def deleteSchool(request):
         })
 
     data = request.json()
-    school_id = data.get("id")
+    schoolId = data.get("id")
 
-    if not school_id:
+    if not schoolId:
         return jsonify({
             "status": 400,
             "message": "参数错误"
@@ -430,7 +430,7 @@ async def deleteSchool(request):
 
     try:
         # 检查校区是否存在
-        school = session.query(School).filter(School.id == school_id).first()
+        school = session.query(School).filter(School.id == schoolId).first()
         if not school:
             return jsonify({
                 "status": 404,
@@ -438,7 +438,7 @@ async def deleteSchool(request):
             })
 
         # 检查是否有用户关联此校区
-        users = session.query(User).filter(User.schoolId == school_id).first()
+        users = session.query(User).filter(User.schoolId == schoolId).first()
         if users:
             return jsonify({
                 "status": 400,
@@ -458,4 +458,59 @@ async def deleteSchool(request):
         return jsonify({
             "status": 500,
             "message": f"删除失败：{str(e)}"
+        })
+
+
+@deptRouter.post("/calcSchoolBudget")
+async def calcSchoolBudget(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    schoolId = data.get("schoolId")  # 修改参数名
+    startDate = data.get("startDate")
+    endDate = data.get("endDate")
+
+    try:
+        # 获取学校信息
+        school = session.query(School).filter(School.id == schoolId).first()
+        if not school:
+            return jsonify({
+                "status": 400,
+                "message": "学校不存在"
+            })
+        query = session.query(Payment).join(Payment.teacher).filter(
+            User.schoolId == schoolId
+        )
+        paymentsBefore = query.filter(Payment.paymentDate < startDate).all()
+        inDuring = query.filter(Payment.paymentDate >= startDate, Payment.paymentDate <= endDate,
+                                Payment.amount > 0).all()
+        exDuring = query.filter(Payment.paymentDate >= startDate, Payment.paymentDate <= endDate,
+                                Payment.amount < 0).all()
+
+        budgetBefore = sum(payment.amount for payment in paymentsBefore)
+        incomeDuring = sum(payment.amount for payment in inDuring)
+        expanseDuring = sum(payment.amount for payment in exDuring)
+        budgetAfter = budgetBefore + incomeDuring + expanseDuring
+
+        return jsonify({
+            "status": 200,
+            "data": {
+                "schoolName": school.name,
+                "budgetBefore": budgetBefore,
+                "incomeDuring": incomeDuring,
+                "expanseDuring": expanseDuring,
+                "budgetAfter": budgetAfter,
+            }
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"计算失败：{e}"
         })

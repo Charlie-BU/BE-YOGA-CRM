@@ -138,7 +138,7 @@ async def getClients(request):
 
     # 处理校区：由于schoolId是@property属性，不是SQL字段，直接filter不执行
     if data.get("schoolId"):
-        query = query.outerjoin(Client.affiliatedUser).filter(User.schoolId == data["schoolId"])
+        query = query.join(Client.affiliatedUser).filter(User.schoolId == data["schoolId"])
 
     # 处理日期范围筛选
     if data.get('startTime') and data.get('endTime'):
@@ -912,7 +912,7 @@ async def getClientPayments(request):
         # 获取该客户的所有交易记录
         payments = session.query(Payment).filter(
             Payment.clientId == client_id
-        ).order_by(Payment.paymentTime.desc()).all()
+        ).order_by(Payment.paymentDate.desc()).all()
         return jsonify({
             "status": 200,
             "payments": [Payment.to_json(payment) for payment in payments]
@@ -944,7 +944,9 @@ async def getPayments(request):
 
         # 添加筛选条件
         if data.get("schoolId"):
-            query = query.filter(Payment.schoolId == data["schoolId"])
+            query = query.join(Payment.teacher).filter(
+                User.schoolId == data["schoolId"]
+            )
         if paymentType == "income":
             query = query.filter(Payment.amount > 0)
         elif paymentType == "expense":
@@ -971,13 +973,13 @@ async def getPayments(request):
             )
 
         if data.get("startTime"):
-            query = query.filter(Payment.paymentTime >= data["startTime"])
+            query = query.filter(Payment.paymentDate >= data["startTime"])
 
         if data.get("endTime"):
-            query = query.filter(Payment.paymentTime <= data["endTime"])
+            query = query.filter(Payment.paymentDate <= data["endTime"])
 
         total = query.count()
-        payments = query.order_by(Payment.paymentTime.desc()).offset(
+        payments = query.order_by(Payment.paymentDate.desc(), Payment.id.desc()).offset(
             (int(page_index) - 1) * int(page_size)).limit(int(page_size)).all()
 
         return jsonify({
@@ -1019,7 +1021,7 @@ async def addPayment(request):
         payment.category = data.get("category")
         payment.paymentMethod = data.get("paymentMethod")
         payment.info = data.get("info")
-        payment.paymentTime = datetime.now()
+        payment.paymentDate = datetime.now().date()
         payment.creatorId = userId
 
         session.add(payment)
