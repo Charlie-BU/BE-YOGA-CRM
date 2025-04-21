@@ -8,7 +8,8 @@ from bluePrints.user import userRouter
 from models import User, session
 
 app = Robyn(__file__)
-# ALLOW_CORS(app, origins=["*"])
+# 生产环境需要注释：使用nginx解决跨域
+ALLOW_CORS(app, origins=["*"])
 
 # 注册蓝图
 app.include_router(userRouter)

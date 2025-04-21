@@ -1128,3 +1128,47 @@ async def deletePayment(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+
+
+@extraRouter.post("/getLogs")
+async def getLogs(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    page_index = data.get("pageIndex", 1)
+    page_size = data.get("pageSize", 10)
+    offset = (int(page_index) - 1) * int(page_size)
+
+    # 构建查询
+    query = session.query(Log).order_by(Log.time.desc())
+
+    # 添加筛选条件
+    if data.get("operatorName"):
+        query = query.join(User, Log.operatorId == User.id)\
+            .filter(User.username.like(f"%{data['operatorName']}%"))
+    if data.get("operation"):
+        query = query.filter(Log.operation.like(f"%{data['operation']}%"))
+    if data.get("startTime"):
+        query = query.filter(Log.time >= data["startTime"])
+    if data.get("endTime"):
+        query = query.filter(Log.time <= data["endTime"])
+
+    # 获取分页数据
+    logs = query.offset(offset).limit(page_size).all()
+    logs = [log.to_json() for log in logs]
+
+    # 获取总数
+    total = query.count()
+
+    return jsonify({
+        "status": 200,
+        "message": "获取日志成功",
+        "logs": logs,
+        "total": total
+    })
