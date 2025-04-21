@@ -8,7 +8,7 @@ from bluePrints.user import userRouter
 from models import User, session
 
 app = Robyn(__file__)
-ALLOW_CORS(app, origins=["*"])
+# ALLOW_CORS(app, origins=["*"])
 
 # 注册蓝图
 app.include_router(userRouter)
