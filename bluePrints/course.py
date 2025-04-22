@@ -100,11 +100,11 @@ async def addCourse(request):
                 })
 
         # 检查课程名称是否重复
-        existing = session.query(Course).filter(Course.name == data['name']).first()
+        existing = session.query(Course).filter(Course.name == data['name'], Course.schoolId == data["schoolId"]).first()
         if existing:
             return jsonify({
                 "status": 400,
-                "message": "课程名称已存在"
+                "message": "同一校区不能有两门相同的课程"
             })
 
         # 创建新课程
@@ -172,12 +172,13 @@ async def updateCourse(request):
         if data.get('name') and data['name'] != course.name:
             existing = session.query(Course).filter(
                 Course.name == data['name'],
+                Course.schoolId == course.schoolId,
                 Course.id != courseId
             ).first()
             if existing:
                 return jsonify({
                     "status": 400,
-                    "message": "课程名称已存在"
+                    "message": "同一校区不能有两门相同的课程"
                 })
 
         # 更新课程信息
