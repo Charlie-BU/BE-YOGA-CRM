@@ -181,8 +181,10 @@ class Client(Base):
         if not self.courseIds or len(self.courseIds) == 0:
             return ""
         courses = [session.query(Course).get(id) for id in self.courseIds]
-        courseNames = [course.name for course in courses]
-        return ", ".join(courseNames)
+        if courses:
+            courseNames = [course.name for course in courses if course is not None]
+            return ", ".join(courseNames)
+        return ""
 
     # 跟进状态：1未成单 / 2已成单
     processStatus = Column(Integer, nullable=True, default=1)
