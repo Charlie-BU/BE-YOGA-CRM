@@ -195,7 +195,7 @@ class Client(Base):
     # 合同编号
     contractNo = Column(Text, nullable=True)
     # 成单时间
-    cooperateTime = Column(DateTime, nullable=True)
+    cooperateTime = Column(DateTime, nullable=True, default=datetime.now)
     # 已学总课时：周
     learnedWeeks = Column(Float, nullable=True, default=0.0)
     # 入住宿舍床

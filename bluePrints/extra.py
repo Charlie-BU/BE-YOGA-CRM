@@ -577,7 +577,6 @@ async def confirmCooperation(request):
     data = request.json()
     clientId = data.get("clientId")
     contractNo = data.get("contractNo")
-    cooperateTime = data.get("cooperateTime")
 
     try:
         client = session.query(Client).get(clientId)
@@ -595,7 +594,7 @@ async def confirmCooperation(request):
             })
         client.processStatus = 2
         client.contractNo = contractNo
-        client.cooperateTime = datetime.strptime(cooperateTime, '%m/%d/%Y')
+        client.cooperateTime = datetime.now()
 
         # 记录操作日志
         log = Log(operatorId=userId, operation=f"客户：{client.name}确认成单，合同编号：{contractNo}")
