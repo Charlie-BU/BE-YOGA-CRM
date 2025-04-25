@@ -223,6 +223,33 @@ async def updateClient(request):
                 "status": -2,
                 "message": "客户不存在"
             })
+
+            # 定义唯一字段及其中文名称
+        uniqueFields = {
+            "phone": "电话",
+            "weixin": "微信",
+            "QQ": "QQ",
+            "douyin": "抖音",
+            "rednote": "小红书",
+            "shangwutong": "商务通"
+        }
+
+        # 检查唯一字段是否已被其他客户使用
+        for field, field_name in uniqueFields.items():
+            if data.get(field) and data[field] != getattr(client, field):  # 只检查非空且已修改的字段
+                # 查询是否已存在该字段值的其他客户
+                existing_client = session.query(Client).filter(
+                    Client.id != client_id,  # 排除当前客户
+                    getattr(Client, field) == data[field]
+                ).first()
+
+                if existing_client:
+                    return jsonify({
+                        "status": 400,
+                        "message": f"已存在相同{field_name}的客户"
+                    })
+
+        # 更新客户信息
         for key, value in data.items():
             if value == "null" or not value:
                 continue
@@ -231,6 +258,7 @@ async def updateClient(request):
                     setattr(client, key, value)
                 except Exception:
                     continue
+
         log = Log(operatorId=userId,
                   operation=f"更新客户信息：{client.name}")
         session.add(log)
@@ -246,7 +274,6 @@ async def updateClient(request):
             "message": f"更新失败：{str(e)}"
         })
 
-
 @extraRouter.post("/addClient")
 async def addClient(request):
     sessionid = request.headers.get("sessionid")
@@ -257,15 +284,35 @@ async def addClient(request):
             "message": "用户未登录"
         })
     data = request.json()
-    required_fields = ['name', 'fromSource', 'weixin']
+    requiredFields = ['name', 'fromSource', 'weixin']
     # 检查必填字段
-    for field in required_fields:
+    for field in requiredFields:
         if not data.get(field):
             return jsonify({
                 "status": 400,
                 "message": f"缺少必填字段：{field}"
             })
     try:
+        uniqueFields = {
+            "phone": "电话",
+            "weixin": "微信",
+            "QQ": "QQ",
+            "douyin": "抖音",
+            "rednote": "小红书",
+            "shangwutong": "商务通"
+        }
+
+        # 检查唯一字段是否已被使用
+        for field, field_name in uniqueFields.items():
+            if data.get(field):  # 只检查非空字段
+                # 查询是否已存在该字段值的客户
+                existing_client = session.query(Client).filter(getattr(Client, field) == data[field]).first()
+                if existing_client:
+                    return jsonify({
+                        "status": 400,
+                        "message": f"已存在相同{field_name}的客户"
+                    })
+
         # 添加创建人和创建时间信息
         data['creatorId'] = userId
         # 创建新客户
@@ -777,16 +824,26 @@ async def batchImportClues(request):
         success_count = 0
         error_count = 0
 
+        # 定义唯一字段及其中文名称
+        uniqueFields = {
+            "phone": "电话",
+            "weixin": "微信",
+            "QQ": "QQ",
+            "douyin": "抖音",
+            "rednote": "小红书",
+            "shangwutong": "商务通"
+        }
+        error_msg = None
         for clue in clues:
             try:
                 # 数据转换
                 new_clue = {
-                    "name": clue.get("姓名", ""),
+                    "name": clue.get("* 姓名", ""),
                     "gender": 1 if clue.get("性别") == "男" else 2 if clue.get("性别") == "女" else None,
                     "age": int(clue.get("年龄", 0)) if clue.get("年龄") else None,
                     "IDNumber": clue.get("身份证", ""),
                     "phone": clue.get("电话", ""),
-                    "weixin": clue.get("微信", ""),
+                    "weixin": clue.get("* 微信", ""),
                     "QQ": clue.get("QQ", ""),
                     "douyin": clue.get("抖音", ""),
                     "rednote": clue.get("小红书", ""),
@@ -802,13 +859,19 @@ async def batchImportClues(request):
                     error_count += 1
                     continue
 
-                # 检查是否已存在（根据姓名和微信号）
-                existing = session.query(Client).filter(
-                    Client.name == new_clue["name"],
-                    Client.weixin == new_clue["weixin"]
-                ).first()
+                # 检查唯一字段是否已被使用
+                field_exists = False
+                for field, field_name in uniqueFields.items():
+                    if new_clue[field]:  # 只检查非空字段
+                        # 查询是否已存在该字段值的客户
+                        existing_client = session.query(Client).filter(
+                            getattr(Client, field) == new_clue[field]).first()
+                        if existing_client:
+                            error_msg = f"存在{field_name}相同的客户等"
+                            field_exists = True
+                            break
 
-                if existing:
+                if field_exists:
                     error_count += 1
                     continue
 
@@ -825,7 +888,7 @@ async def batchImportClues(request):
 
         return jsonify({
             "status": 200,
-            "message": f"导入完成：成功{success_count}条，失败{error_count}条",
+            "message": f"导入完成：成功{success_count}条，失败{error_count}条" + (f"。失败原因：{error_msg}" if error_msg else ""),
             "data": {
                 "success": success_count,
                 "error": error_count
@@ -1149,7 +1212,7 @@ async def getLogs(request):
 
     # 添加筛选条件
     if data.get("operatorName"):
-        query = query.join(User, Log.operatorId == User.id)\
+        query = query.join(User, Log.operatorId == User.id) \
             .filter(User.username.like(f"%{data['operatorName']}%"))
     if data.get("operation"):
         query = query.filter(Log.operation.like(f"%{data['operation']}%"))
