@@ -108,6 +108,8 @@ async def getClients(request):
 
     data = request.json()
     clientStatus = data.get("clientStatus")
+    if clientStatus == "null":
+        clientStatus = None
     page_index = data.get("pageIndex", 1)
     page_size = data.get("pageSize", 10)
     offset = (int(page_index) - 1) * int(page_size)
@@ -528,7 +530,7 @@ async def submitReserve(request):
         # 日期格式处理
         appointDate = datetime.strptime(appointDate, '%m/%d/%Y')
 
-    useCombo = data.get("useCombo")
+    useCombo = bool(data.get("useCombo"))
     if useCombo:
         client.comboId = data.get("comboId", None)
 
