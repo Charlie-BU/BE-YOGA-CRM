@@ -239,7 +239,6 @@ async def updateClient(request):
                 "message": "客户不存在"
             })
 
-            # 定义唯一字段及其中文名称
         uniqueFields = {
             "phone": "电话",
             "weixin": "微信",
@@ -270,8 +269,12 @@ async def updateClient(request):
                 continue
             if hasattr(client, key):
                 try:
+                    if key == "info":
+                        client.info.append(value)
+                        continue
                     setattr(client, key, value)
-                except Exception:
+                except Exception as e:
+                    print("快看看！",e)
                     continue
 
         log = Log(operatorId=userId,
@@ -553,7 +556,7 @@ async def submitReserve(request):
     nextTalkDate = data.get("nextTalkDate")
     if nextTalkDate:
         nextTalkDate = datetime.strptime(nextTalkDate, '%m/%d/%Y')
-    detailedInfo = data.get("detailedInfo")
+    info = data.get("info")
     try:
         if client.clientStatus == 4:
             return jsonify({
@@ -565,7 +568,7 @@ async def submitReserve(request):
         client.appointDate = appointDate if appointDate else None
         client.courseIds = courseIds
         client.nextTalkDate = nextTalkDate if nextTalkDate else None
-        client.detailedInfo = detailedInfo
+        client.info.append(info)
         client.processStatus = 1
         log = Log(operatorId=userId, operation=f"客户：{client.name}预约到店")
         session.add(log)
@@ -608,7 +611,6 @@ async def cancelReserve(request):
         client.appointDate = None
         client.courseIds = None
         client.nextTalkDate = None
-        client.detailedInfo = None
         client.processStatus = None
         # 记录操作日志
         log = Log(operatorId=userId, operation=f"客户：{client.name}取消预约")

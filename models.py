@@ -138,10 +138,8 @@ class Client(Base):
         return creator.username
 
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
-    # 备注（公海时用）
-    info = Column(Text, nullable=True)
-    # 预约备注（客户时用）
-    detailedInfo = Column(Text, nullable=True)
+    # 客户备注
+    info = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
 
     # 预约人
     appointerId = Column(Integer, nullable=True)
@@ -162,6 +160,7 @@ class Client(Base):
         if appointer and appointer.schoolId:
             return appointer.schoolId
         return None
+
     @property
     def schoolName(self):
         if self.affiliatedUser:
@@ -225,7 +224,6 @@ class Client(Base):
             "creatorName": self.creatorName,
             "createdTime": self.createdTime,
             "info": self.info,
-            "detailedInfo": self.detailedInfo,
             "appointerId": self.appointerId,
             "appointerName": self.appointerName,
             "schoolId": self.schoolId,
@@ -393,32 +391,38 @@ class Payment(Base):
     # 客户：仅收入
     clientId = Column(Integer, ForeignKey("client.id"), nullable=True)
     client = relationship("Client", backref="payments")
+
     @property
     def clientName(self):
         if self.clientId:
             return self.client.name
         return ""
+
     @property
     def clientPhone(self):
         if self.clientId:
             return self.client.phone
         return ""
+
     # 收款方：仅支出
     receiver = Column(Text, nullable=True)
     # 负责老师
     teacherId = Column(Integer, ForeignKey("user.id"), nullable=True)
     teacher = relationship("User", backref="payments")
+
     # 所属校区（取决于负责老师）
     @property
     def schoolId(self):
         if self.teacherId:
             return self.teacher.schoolId
         return None
+
     @property
     def schoolName(self):
         if self.teacherId:
             return self.teacher.school.name
         return ""
+
     # 金额：单位元，正为收入，负为支出
     amount = Column(Integer, nullable=True)
     # 类别：1定金 / 2尾款 / 3住宿费 / 4补差价 / 5其他
