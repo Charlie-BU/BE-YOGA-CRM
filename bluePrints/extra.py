@@ -52,7 +52,9 @@ async def getClueClients(request):
     if data.get("name"):
         query = query.filter(Client.name.like(f"%{data['name']}%"))
     if data.get("fromSource"):
-        query = query.filter(Client.fromSource == data["fromSource"])
+        fromSource = json.loads(data["fromSource"])
+        if fromSource:  # 修改为支持多选
+            query = query.filter(Client.fromSource.in_(fromSource))
     if data.get("gender"):
         query = query.filter(Client.gender == data["gender"])
     if data.get("age"):
@@ -74,11 +76,22 @@ async def getClueClients(request):
     if data.get("address"):
         query = query.filter(Client.address.like(f"%{data['address']}%"))
     if data.get("clientStatus"):
-        query = query.filter(Client.clientStatus == data["clientStatus"])
+        clientStatus = json.loads(data["clientStatus"])
+        if clientStatus:  # 修改为支持多选
+            query = query.filter(Client.clientStatus.in_(clientStatus))
     if data.get("startTime"):
         query = query.filter(Client.createdTime >= data["startTime"])
     if data.get("endTime"):
         query = query.filter(Client.createdTime <= data["endTime"])
+
+    if data.get("creatorId"):
+        creatorId = json.loads(data["creatorId"])
+        if creatorId:
+            query = query.filter(Client.creatorId.in_(creatorId))
+    if data.get("affiliatedUserId"):
+        affiliatedUserId = json.loads(data["affiliatedUserId"])
+        if affiliatedUserId:
+            query = query.filter(Client.affiliatedUserId.in_(affiliatedUserId))
 
     # 获取分页数据
     clients = query.offset(offset).limit(page_size).all()
@@ -275,6 +288,7 @@ async def updateClient(request):
             "status": -3,
             "message": f"更新失败：{str(e)}"
         })
+
 
 @extraRouter.post("/addClient")
 async def addClient(request):
@@ -890,7 +904,8 @@ async def batchImportClues(request):
 
         return jsonify({
             "status": 200,
-            "message": f"导入完成：成功{success_count}条，失败{error_count}条" + (f"。失败原因：{error_msg}" if error_msg else ""),
+            "message": f"导入完成：成功{success_count}条，失败{error_count}条" + (
+                f"。失败原因：{error_msg}" if error_msg else ""),
             "data": {
                 "success": success_count,
                 "error": error_count
