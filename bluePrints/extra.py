@@ -274,7 +274,6 @@ async def updateClient(request):
                         continue
                     setattr(client, key, value)
                 except Exception as e:
-                    print("快看看！",e)
                     continue
 
         log = Log(operatorId=userId,

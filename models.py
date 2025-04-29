@@ -185,6 +185,9 @@ class Client(Base):
             return ", ".join(courseNames)
         return ""
 
+    # 班级
+    lessonIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
+
     # 跟进状态：1未成单 / 2已成单
     processStatus = Column(Integer, nullable=True, default=1)
     # 预约日期
@@ -231,6 +234,7 @@ class Client(Base):
             "courseIds": self.courseIds,
             "courseNames": self.courseNames,
             "comboId": self.comboId,
+            "lessonIds": self.lessonIds,
             "processStatus": self.processStatus,
             "appointDate": self.appointDate,
             "nextTalkDate": self.nextTalkDate,
@@ -282,44 +286,9 @@ class Course(Base):
     schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
     school = relationship("School", backref="courses")
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
-    # 毕业人数
-    graduatedStuNumber = Column(Integer, nullable=True, default=0)
     # 课时：周
     duration = Column(Float, nullable=True)
     price = Column(Float, nullable=True)
-    # 主讲人
-    chiefTeacherId = Column(Integer, nullable=True)
-
-    @property
-    def chiefTeacherName(self):
-        chiefTeacher = session.query(User).get(self.chiefTeacherId)
-        if chiefTeacher:
-            return chiefTeacher.username
-        else:
-            return ""
-
-    # 班主任
-    classTeacherId = Column(Integer, nullable=True)
-
-    @property
-    def classTeacherName(self):
-        classTeacher = session.query(User).get(self.classTeacherId)
-        if classTeacher:
-            return classTeacher.username
-        else:
-            return ""
-
-    # 助教
-    teachingAssistantId = Column(Integer, nullable=True)
-
-    @property
-    def teachingAssistantName(self):
-        teachingAssistant = session.query(User).get(self.teachingAssistantId)
-        if teachingAssistant:
-            return teachingAssistant.username
-        else:
-            return ""
-
     info = Column(Text, nullable=True)
 
     def to_json(self):
@@ -330,15 +299,8 @@ class Course(Base):
             "schoolId": self.schoolId,
             "creatorId": self.creatorId,
             "createdTime": self.createdTime,
-            "graduatedStuNumber": self.graduatedStuNumber,
             "duration": self.duration,
             "price": self.price,
-            "chiefTeacherId": self.chiefTeacherId,
-            "chiefTeacherName": self.chiefTeacherName,
-            "classTeacherId": self.classTeacherId,
-            "classTeacherName": self.classTeacherName,
-            "teachingAssistantId": self.teachingAssistantId,
-            "teachingAssistantName": self.teachingAssistantName,
             "info": self.info,
         }
         if self.creatorId:
@@ -382,6 +344,100 @@ class CourseCombo(Base):
         if self.courseIds and len(self.courseIds) > 0:
             courses = [session.query(Course).get(courseId) for courseId in self.courseIds]
             data["courseNames"] = [course.name for course in courses]
+        return data
+
+
+# 班级
+class Lesson(Base):
+    __tablename__ = "lesson"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=True)
+    courseId = Column(Integer, ForeignKey("course.id"), nullable=True)
+    course = relationship("Course", backref="lessons")
+    # 开课日期
+    startDate = Column(Date, nullable=True)
+    # 结课日期
+    endDate = Column(Date, nullable=True)
+    # 毕业人数
+    graduatedStuNumber = Column(Integer, nullable=True, default=0)
+
+    @property
+    def courseName(self):
+        if self.courseId:
+            return self.course.name
+        return None
+
+    @property
+    def category(self):
+        if self.courseId:
+            return self.course.category
+        return None
+
+    @property
+    def schoolId(self):
+        if self.courseId:
+            return self.course.schoolId
+        return None
+
+    # 主讲人
+    chiefTeacherId = Column(Integer, nullable=True)
+
+    @property
+    def chiefTeacherName(self):
+        chiefTeacher = session.query(User).get(self.chiefTeacherId)
+        if chiefTeacher:
+            return chiefTeacher.username
+        else:
+            return ""
+
+    # 班主任
+    classTeacherId = Column(Integer, nullable=True)
+
+    @property
+    def classTeacherName(self):
+        classTeacher = session.query(User).get(self.classTeacherId)
+        if classTeacher:
+            return classTeacher.username
+        else:
+            return ""
+
+    # 助教
+    teachingAssistantId = Column(Integer, nullable=True)
+
+    @property
+    def teachingAssistantName(self):
+        teachingAssistant = session.query(User).get(self.teachingAssistantId)
+        if teachingAssistant:
+            return teachingAssistant.username
+        else:
+            return ""
+
+    info = Column(Text, nullable=True)
+    createdTime = Column(DateTime, nullable=True, default=datetime.now)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "courseId": self.courseId,
+            "courseName": self.courseName,
+            "startDate": self.startDate,
+            "endDate": self.endDate,
+            "category": self.category,
+            "schoolId": self.schoolId,
+            "graduatedStuNumber": self.graduatedStuNumber,
+            "chiefTeacherId": self.chiefTeacherId,
+            "chiefTeacherName": self.chiefTeacherName,
+            "classTeacherId": self.classTeacherId,
+            "classTeacherName": self.classTeacherName,
+            "teachingAssistantId": self.teachingAssistantId,
+            "teachingAssistantName": self.teachingAssistantName,
+            "info": self.info,
+            "createdTime": self.createdTime,
+        }
+        if self.schoolId:
+            school = session.query(School).get(self.schoolId)
+            data["schoolName"] = school.name
         return data
 
 
