@@ -546,7 +546,7 @@ async def submitReserve(request):
         # 日期格式处理
         appointDate = datetime.strptime(appointDate, '%m/%d/%Y')
 
-    useCombo = bool(data.get("useCombo"))
+    useCombo = json.loads(data.get("useCombo"))
     if useCombo:
         client.comboId = data.get("comboId", None)
 

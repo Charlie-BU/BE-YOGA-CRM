@@ -198,9 +198,9 @@ async def getAllUsers(request):
         # 获取分页数据
         query = session.query(User)
         if name:
-            query = query.filter(User.username.like(f"%{name}%"))
+            query = query.filter(User.username.like(f"%{name}%")).order_by(User.schoolId)
         if schoolId:
-            query = query.filter(User.schoolId == schoolId)
+            query = query.filter(User.schoolId == schoolId).order_by(User.schoolId)
         users = query.offset(offset).limit(page_size).all()
         users = [User.to_json(user) for user in users]
         # 获取总数
@@ -394,3 +394,141 @@ async def initUserPwd(request):
             "status": 500,
             "message": f"密码初始化失败：{str(e)}"
         })
+
+# TODO
+# @userRouter.post("/getCustomerServiceSummaryData")
+# async def getCustomerServiceSummaryData(request):
+#     sessionid = request.headers.get("sessionid")
+#     userId = checkSessionid(sessionid).get("userId")
+#     if not userId:
+#         return jsonify({
+#             "status": -1,
+#             "message": "用户未登录"
+#         })
+#
+#     data = request.json()
+#     startDate = data.get("startDate")
+#     endDate = data.get("endDate")
+#
+#     try:
+#         users = session.query(User).order_by(User.schoolId).all()
+#
+#         # 构建查询条件
+#         query = session.query(
+#             User.id,
+#             User.username,
+#             User.schoolName,
+#             func.count(case([(Customer.city == '上海', 1)])).label('shanghaiCount'),
+#             func.count(case([(Customer.city == '北京', 1)])).label('beijingCount'),
+#             func.count(case([(Customer.city == '广州', 1)])).label('guangzhouCount'),
+#             func.count(case([(Customer.city == '成都', 1)])).label('chengduCount'),
+#             # 总体数据
+#             func.count(Customer.id).label('totalWechat'),
+#             func.sum(case([(Customer.status == 'signed', 1)], else_=0)).label('totalSignup'),
+#             # 商务通数据
+#             func.count(case([(Customer.source == 'business', 1)])).label('bwAdd'),
+#             func.sum(case([(and_(Customer.source == 'business', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'bwSignup'),
+#             # 红推数据
+#             func.count(case([(Customer.source == 'red', 1)])).label('redAdd'),
+#             func.sum(case([(and_(Customer.source == 'red', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'redSignup'),
+#             # 信息流数据
+#             func.count(case([(Customer.source == 'info', 1)])).label('infoAdd'),
+#             func.sum(case([(and_(Customer.source == 'info', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'infoSignup'),
+#             # 点评数据
+#             func.count(case([(Customer.source == 'dianping', 1)])).label('dpAdd'),
+#             func.sum(case([(and_(Customer.source == 'dianping', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'dpSignup'),
+#             # 电话数据
+#             func.count(case([(Customer.source == 'phone', 1)])).label('phoneAdd'),
+#             func.sum(case([(and_(Customer.source == 'phone', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'phoneSignup'),
+#             # 小红书数据
+#             func.count(case([(Customer.source == 'xiaohongshu', 1)])).label('xhsAdd'),
+#             func.sum(case([(and_(Customer.source == 'xiaohongshu', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'xhsSignup'),
+#             # 抖音数据
+#             func.count(case([(Customer.source == 'douyin', 1)])).label('dyAdd'),
+#             func.sum(case([(and_(Customer.source == 'douyin', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'dySignup'),
+#             # 推荐/介绍数据
+#             func.count(case([(Customer.source == 'referral', 1)])).label('referAdd'),
+#             func.sum(case([(and_(Customer.source == 'referral', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'referSignup'),
+#             # 自己进店数据
+#             func.count(case([(Customer.source == 'self', 1)])).label('selfAdd'),
+#             func.sum(case([(and_(Customer.source == 'self', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'selfSignup'),
+#             # 公众号数据
+#             func.count(case([(Customer.source == 'wechat', 1)])).label('mpAdd'),
+#             func.sum(case([(and_(Customer.source == 'wechat', Customer.status == 'signed'), 1)], else_=0)).label(
+#                 'mpSignup'),
+#             # 视频号数据
+#             func.count(case([(Customer.source == 'video', 1)])).label('videoAdd'),
+#             func.count(case([(Customer.source == 'video2', 1)])).label('videoAdd2')
+#         ).join(Customer, User.id == Customer.userId)
+#
+#         # 添加时间筛选条件
+#         if startDate and endDate:
+#             query = query.filter(and_(
+#                 Customer.createTime >= startDate,
+#                 Customer.createTime <= endDate
+#             ))
+#
+#         # 按用户分组
+#         query = query.group_by(User.id)
+#
+#         # 执行查询
+#         results = query.all()
+#
+#         # 转换结果为字典列表
+#         allData = []
+#         for result in results:
+#             data_dict = {
+#                 'userId': result.id,
+#                 'username': result.username,
+#                 'schoolName': result.schoolName,
+#                 'shanghaiCount': result.shanghaiCount,
+#                 'beijingCount': result.beijingCount,
+#                 'guangzhouCount': result.guangzhouCount,
+#                 'chengduCount': result.chengduCount,
+#                 'totalWechat': result.totalWechat,
+#                 'totalSignup': result.totalSignup,
+#                 'bwAdd': result.bwAdd,
+#                 'bwSignup': result.bwSignup,
+#                 'redAdd': result.redAdd,
+#                 'redSignup': result.redSignup,
+#                 'infoAdd': result.infoAdd,
+#                 'infoSignup': result.infoSignup,
+#                 'dpAdd': result.dpAdd,
+#                 'dpSignup': result.dpSignup,
+#                 'phoneAdd': result.phoneAdd,
+#                 'phoneSignup': result.phoneSignup,
+#                 'xhsAdd': result.xhsAdd,
+#                 'xhsSignup': result.xhsSignup,
+#                 'dyAdd': result.dyAdd,
+#                 'dySignup': result.dySignup,
+#                 'referAdd': result.referAdd,
+#                 'referSignup': result.referSignup,
+#                 'selfAdd': result.selfAdd,
+#                 'selfSignup': result.selfSignup,
+#                 'mpAdd': result.mpAdd,
+#                 'mpSignup': result.mpSignup,
+#                 'videoAdd': result.videoAdd,
+#                 'videoAdd2': result.videoAdd2
+#             }
+#             allData.append(data_dict)
+#
+#         return jsonify({
+#             "status": 200,
+#             "message": "获取数据成功",
+#             "allData": allData
+#         })
+#
+#     except Exception as e:
+#         return jsonify({
+#             "status": 500,
+#             "message": f"获取数据失败：{str(e)}"
+#         })
