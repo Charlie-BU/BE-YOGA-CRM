@@ -1,7 +1,9 @@
 import json
 import time
+from datetime import timedelta
 
 from robyn import SubRouter, jsonify
+from sqlalchemy import case, func, and_, text
 
 from models import *
 from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
@@ -395,7 +397,117 @@ async def initUserPwd(request):
             "message": f"密码初始化失败：{str(e)}"
         })
 
-# TODO
+
+@userRouter.post("/getCustomerServiceSummaryData")
+async def getCustomerServiceSummaryData(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    startDate = data.get("startDate")
+    endDate = data.get("endDate")
+
+    try:
+        users = session.query(User).order_by(User.schoolId).all()
+        allData = []
+        for user in users:
+            # 分配给当前客服的客户
+            hisClients = user.cooperateStudents
+            # 已转客户的（加）- 修改日期比较逻辑
+            convertedToClients = [
+                hisClient for hisClient in hisClients
+                if hisClient.clientStatus >= 3
+                   and (startDate <= hisClient.toClientTime.strftime(
+                    '%Y-%m-%d') <= endDate if startDate and endDate else True)
+            ]
+            # 已成单的（报）- 修改日期比较逻辑
+            dealedClients = [
+                hisClient for hisClient in hisClients
+                if hisClient.processStatus == 2
+                   and (startDate <= hisClient.cooperateTime.strftime(
+                    '%Y-%m-%d') <= endDate if startDate and endDate else True)
+            ]
+
+            shanghaiCount = len([client for client in dealedClients if client.schoolId == 2])
+            beijingCount = len([client for client in dealedClients if client.schoolId == 4])
+            guangzhouCount = len([client for client in dealedClients if client.schoolId == 3])
+            chengduCount = len([client for client in dealedClients if client.schoolId == 1])
+            totalToClient = len(convertedToClients)
+            totalDealed = len(dealedClients)
+
+            bwAdd = len([client for client in convertedToClients if client.fromSource == 1])
+            bwSignup = len([client for client in dealedClients if client.fromSource == 1])
+            redAdd = len([client for client in convertedToClients if client.fromSource in [10, 20]])
+            redSignup = len([client for client in dealedClients if client.fromSource in [10, 20]])
+            infoAdd = len([client for client in convertedToClients if client.fromSource in [14, 16, 17, 18, 19, 22]])
+            infoSignup = len([client for client in dealedClients if client.fromSource in [14, 16, 17, 18, 19, 22]])
+            dpAdd = len([client for client in convertedToClients if client.fromSource == 7])
+            dpSignup = len([client for client in dealedClients if client.fromSource == 7])
+            phoneAdd = len([client for client in convertedToClients if client.fromSource == 2])
+            phoneSignup = len([client for client in dealedClients if client.fromSource == 2])
+            xhsAdd = len([client for client in convertedToClients if client.fromSource == 8])
+            xhsSignup = len([client for client in dealedClients if client.fromSource == 8])
+            dyAdd = len([client for client in convertedToClients if client.fromSource in [9, 14]])
+            dySignup = len([client for client in dealedClients if client.fromSource in [9, 14]])
+            referAdd = len([client for client in convertedToClients if client.fromSource == 3])
+            referSignup = len([client for client in dealedClients if client.fromSource == 3])
+            selfAdd = len([client for client in convertedToClients if client.fromSource == 4])
+            selfSignup = len([client for client in dealedClients if client.fromSource == 4])
+            mpAdd = len([client for client in convertedToClients if client.fromSource == 11])
+            mpSignup = len([client for client in dealedClients if client.fromSource == 11])
+            videoAdd = len([client for client in convertedToClients if client.fromSource == 12])
+            videoSignup = len([client for client in dealedClients if client.fromSource == 12])
+
+            allData.append({
+                "userId": user.id,
+                "username": user.username,
+                "schoolName": user.school.name,
+                "shanghaiCount": shanghaiCount,
+                "beijingCount": beijingCount,
+                "guangzhouCount": guangzhouCount,
+                "chengduCount": chengduCount,
+                "totalToClient": totalToClient,
+                "totalDealed": totalDealed,
+                "bwAdd": bwAdd,
+                "bwSignup": bwSignup,
+                "redAdd": redAdd,
+                "redSignup": redSignup,
+                "infoAdd": infoAdd,
+                "infoSignup": infoSignup,
+                "dpAdd": dpAdd,
+                "dpSignup": dpSignup,
+                "phoneAdd": phoneAdd,
+                "phoneSignup": phoneSignup,
+                "xhsAdd": xhsAdd,
+                "xhsSignup": xhsSignup,
+                "dyAdd": dyAdd,
+                "dySignup": dySignup,
+                "referAdd": referAdd,
+                "referSignup": referSignup,
+                "selfAdd": selfAdd,
+                "selfSignup": selfSignup,
+                "mpAdd": mpAdd,
+                "mpSignup": mpSignup,
+                "videoAdd": videoAdd,
+                "videoSignup": videoSignup,
+            })
+        return jsonify({
+            "status": 200,
+            "message": "数据获取成功",
+            "allData": allData
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取数据失败：{str(e)}"
+        })
+
+
 # @userRouter.post("/getCustomerServiceSummaryData")
 # async def getCustomerServiceSummaryData(request):
 #     sessionid = request.headers.get("sessionid")
@@ -411,119 +523,95 @@ async def initUserPwd(request):
 #     endDate = data.get("endDate")
 #
 #     try:
-#         users = session.query(User).order_by(User.schoolId).all()
-#
-#         # 构建查询条件
-#         query = session.query(
+#         # 构建基础查询
+#         base_query = session.query(
 #             User.id,
 #             User.username,
-#             User.schoolName,
-#             func.count(case([(Customer.city == '上海', 1)])).label('shanghaiCount'),
-#             func.count(case([(Customer.city == '北京', 1)])).label('beijingCount'),
-#             func.count(case([(Customer.city == '广州', 1)])).label('guangzhouCount'),
-#             func.count(case([(Customer.city == '成都', 1)])).label('chengduCount'),
-#             # 总体数据
-#             func.count(Customer.id).label('totalWechat'),
-#             func.sum(case([(Customer.status == 'signed', 1)], else_=0)).label('totalSignup'),
-#             # 商务通数据
-#             func.count(case([(Customer.source == 'business', 1)])).label('bwAdd'),
-#             func.sum(case([(and_(Customer.source == 'business', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'bwSignup'),
-#             # 红推数据
-#             func.count(case([(Customer.source == 'red', 1)])).label('redAdd'),
-#             func.sum(case([(and_(Customer.source == 'red', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'redSignup'),
-#             # 信息流数据
-#             func.count(case([(Customer.source == 'info', 1)])).label('infoAdd'),
-#             func.sum(case([(and_(Customer.source == 'info', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'infoSignup'),
-#             # 点评数据
-#             func.count(case([(Customer.source == 'dianping', 1)])).label('dpAdd'),
-#             func.sum(case([(and_(Customer.source == 'dianping', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'dpSignup'),
-#             # 电话数据
-#             func.count(case([(Customer.source == 'phone', 1)])).label('phoneAdd'),
-#             func.sum(case([(and_(Customer.source == 'phone', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'phoneSignup'),
-#             # 小红书数据
-#             func.count(case([(Customer.source == 'xiaohongshu', 1)])).label('xhsAdd'),
-#             func.sum(case([(and_(Customer.source == 'xiaohongshu', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'xhsSignup'),
-#             # 抖音数据
-#             func.count(case([(Customer.source == 'douyin', 1)])).label('dyAdd'),
-#             func.sum(case([(and_(Customer.source == 'douyin', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'dySignup'),
-#             # 推荐/介绍数据
-#             func.count(case([(Customer.source == 'referral', 1)])).label('referAdd'),
-#             func.sum(case([(and_(Customer.source == 'referral', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'referSignup'),
-#             # 自己进店数据
-#             func.count(case([(Customer.source == 'self', 1)])).label('selfAdd'),
-#             func.sum(case([(and_(Customer.source == 'self', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'selfSignup'),
-#             # 公众号数据
-#             func.count(case([(Customer.source == 'wechat', 1)])).label('mpAdd'),
-#             func.sum(case([(and_(Customer.source == 'wechat', Customer.status == 'signed'), 1)], else_=0)).label(
-#                 'mpSignup'),
-#             # 视频号数据
-#             func.count(case([(Customer.source == 'video', 1)])).label('videoAdd'),
-#             func.count(case([(Customer.source == 'video2', 1)])).label('videoAdd2')
-#         ).join(Customer, User.id == Customer.userId)
+#             School.name.label('schoolName')
+#         ).join(School, User.schoolId == School.id)
 #
-#         # 添加时间筛选条件
-#         if startDate and endDate:
-#             query = query.filter(and_(
-#                 Customer.createTime >= startDate,
-#                 Customer.createTime <= endDate
-#             ))
+#         # 构建时间过滤条件
+#         date_filter = and_(
+#             Client.cooperateTime >= startDate if startDate else text('1=1'),
+#             Client.cooperateTime <= endDate if endDate else text('1=1')
+#         )
 #
-#         # 按用户分组
-#         query = query.group_by(User.id)
+#         # 修改 case 语句语法
+#         base_query = base_query.add_columns(
+#             # 城市报名统计
+#             func.count(case((Client.schoolId == 2, 1))).label('shanghaiCount'),
+#             func.count(case((Client.schoolId == 4, 1))).label('beijingCount'),
+#             func.count(case((Client.schoolId == 3, 1))).label('guangzhouCount'),
+#             func.count(case((Client.schoolId == 1, 1))).label('chengduCount'),
+#
+#             # 总体统计
+#             func.count(Client.id).label('totalToClient'),
+#             func.sum(case((Client.processStatus == 2, 1))).label('totalDealed'),
+#
+#             # 各渠道统计
+#             func.count(case((Client.fromSource == 1, 1))).label('bwAdd'),
+#             func.sum(case((and_(Client.fromSource == 1, Client.processStatus == 2), 1))).label('bwSignup'),
+#
+#             func.count(case((Client.fromSource.in_([10, 20]), 1))).label('redAdd'),
+#             func.sum(case((and_(Client.fromSource.in_([10, 20]), Client.processStatus == 2), 1))).label('redSignup'),
+#
+#             func.count(case((Client.fromSource.in_([14, 16, 17, 18, 19, 22]), 1))).label('infoAdd'),
+#             func.sum(case((and_(Client.fromSource.in_([14, 16, 17, 18, 19, 22]), Client.processStatus == 2), 1))).label('infoSignup'),
+#
+#             func.count(case((Client.fromSource == 7, 1))).label('dpAdd'),
+#             func.sum(case((and_(Client.fromSource == 7, Client.processStatus == 2), 1))).label('dpSignup'),
+#
+#             func.count(case((Client.fromSource == 2, 1))).label('phoneAdd'),
+#             func.sum(case((and_(Client.fromSource == 2, Client.processStatus == 2), 1))).label('phoneSignup'),
+#
+#             func.count(case((Client.fromSource == 8, 1))).label('xhsAdd'),
+#             func.sum(case((and_(Client.fromSource == 8, Client.processStatus == 2), 1))).label('xhsSignup'),
+#
+#             func.count(case((Client.fromSource.in_([9, 14]), 1))).label('dyAdd'),
+#             func.sum(case((and_(Client.fromSource.in_([9, 14]), Client.processStatus == 2), 1))).label('dySignup'),
+#
+#             func.count(case((Client.fromSource == 3, 1))).label('referAdd'),
+#             func.sum(case((and_(Client.fromSource == 3, Client.processStatus == 2), 1))).label('referSignup'),
+#
+#             func.count(case((Client.fromSource == 4, 1))).label('selfAdd'),
+#             func.sum(case((and_(Client.fromSource == 4, Client.processStatus == 2), 1))).label('selfSignup'),
+#
+#             func.count(case((Client.fromSource == 11, 1))).label('mpAdd'),
+#             func.sum(case((and_(Client.fromSource == 11, Client.processStatus == 2), 1))).label('mpSignup'),
+#
+#             func.count(case((Client.fromSource == 12, 1))).label('videoAdd'),
+#             func.sum(case((and_(Client.fromSource == 12, Client.processStatus == 2), 1))).label('videoSignup')
+#         )
+#
+#         # 应用过滤条件并分组
+#         final_query = base_query.outerjoin(
+#             Client,
+#             and_(
+#                 User.id == Client.id,
+#                 date_filter
+#             )
+#         ).group_by(
+#             User.id,
+#             User.username,
+#             School.name
+#         )
 #
 #         # 执行查询
-#         results = query.all()
+#         results = final_query.all()
 #
 #         # 转换结果为字典列表
 #         allData = []
-#         for result in results:
-#             data_dict = {
-#                 'userId': result.id,
-#                 'username': result.username,
-#                 'schoolName': result.schoolName,
-#                 'shanghaiCount': result.shanghaiCount,
-#                 'beijingCount': result.beijingCount,
-#                 'guangzhouCount': result.guangzhouCount,
-#                 'chengduCount': result.chengduCount,
-#                 'totalWechat': result.totalWechat,
-#                 'totalSignup': result.totalSignup,
-#                 'bwAdd': result.bwAdd,
-#                 'bwSignup': result.bwSignup,
-#                 'redAdd': result.redAdd,
-#                 'redSignup': result.redSignup,
-#                 'infoAdd': result.infoAdd,
-#                 'infoSignup': result.infoSignup,
-#                 'dpAdd': result.dpAdd,
-#                 'dpSignup': result.dpSignup,
-#                 'phoneAdd': result.phoneAdd,
-#                 'phoneSignup': result.phoneSignup,
-#                 'xhsAdd': result.xhsAdd,
-#                 'xhsSignup': result.xhsSignup,
-#                 'dyAdd': result.dyAdd,
-#                 'dySignup': result.dySignup,
-#                 'referAdd': result.referAdd,
-#                 'referSignup': result.referSignup,
-#                 'selfAdd': result.selfAdd,
-#                 'selfSignup': result.selfSignup,
-#                 'mpAdd': result.mpAdd,
-#                 'mpSignup': result.mpSignup,
-#                 'videoAdd': result.videoAdd,
-#                 'videoAdd2': result.videoAdd2
-#             }
-#             allData.append(data_dict)
+#         for row in results:
+#             data = row._asdict()
+#             # 将 None 值转换为 0
+#             for key in data:
+#                 if data[key] is None:
+#                     data[key] = 0
+#             allData.append(data)
 #
 #         return jsonify({
 #             "status": 200,
-#             "message": "获取数据成功",
+#             "message": "数据获取成功",
 #             "allData": allData
 #         })
 #
@@ -532,3 +620,111 @@ async def initUserPwd(request):
 #             "status": 500,
 #             "message": f"获取数据失败：{str(e)}"
 #         })
+
+
+@userRouter.post("/getDateSummaryDataPerDay")
+async def getDateSummaryDataPerDay(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    date = data.get("date")
+    try:
+        # 获取当天的数据
+        day_start = f"{date} 00:00:00"
+        day_end = f"{date} 23:59:59"
+
+        # 查询当天转化的客户
+        convertedToClients = session.query(Client).filter(
+            Client.clientStatus >= 3,
+            Client.toClientTime.between(day_start, day_end)
+        ).all()
+
+        # 查询当天成单的客户
+        dealedClients = session.query(Client).filter(
+            Client.processStatus == 2,
+            Client.cooperateTime.between(day_start, day_end)
+        ).all()
+
+        # 统计各城市数据
+        shanghaiCount = len([client for client in dealedClients if client.schoolId == 2])
+        beijingCount = len([client for client in dealedClients if client.schoolId == 4])
+        guangzhouCount = len([client for client in dealedClients if client.schoolId == 3])
+        chengduCount = len([client for client in dealedClients if client.schoolId == 1])
+
+        # 统计总数
+        totalToClient = len(convertedToClients)
+        totalDealed = len(dealedClients)
+
+        # 统计各渠道数据
+        bwAdd = len([client for client in convertedToClients if client.fromSource == 1])
+        bwSignup = len([client for client in dealedClients if client.fromSource == 1])
+        redAdd = len([client for client in convertedToClients if client.fromSource in [10, 20]])
+        redSignup = len([client for client in dealedClients if client.fromSource in [10, 20]])
+        infoAdd = len([client for client in convertedToClients if client.fromSource in [14, 16, 17, 18, 19, 22]])
+        infoSignup = len([client for client in dealedClients if client.fromSource in [14, 16, 17, 18, 19, 22]])
+        dpAdd = len([client for client in convertedToClients if client.fromSource == 7])
+        dpSignup = len([client for client in dealedClients if client.fromSource == 7])
+        phoneAdd = len([client for client in convertedToClients if client.fromSource == 2])
+        phoneSignup = len([client for client in dealedClients if client.fromSource == 2])
+        xhsAdd = len([client for client in convertedToClients if client.fromSource == 8])
+        xhsSignup = len([client for client in dealedClients if client.fromSource == 8])
+        dyAdd = len([client for client in convertedToClients if client.fromSource in [9, 14]])
+        dySignup = len([client for client in dealedClients if client.fromSource in [9, 14]])
+        referAdd = len([client for client in convertedToClients if client.fromSource == 3])
+        referSignup = len([client for client in dealedClients if client.fromSource == 3])
+        selfAdd = len([client for client in convertedToClients if client.fromSource == 4])
+        selfSignup = len([client for client in dealedClients if client.fromSource == 4])
+        mpAdd = len([client for client in convertedToClients if client.fromSource == 11])
+        mpSignup = len([client for client in dealedClients if client.fromSource == 11])
+        videoAdd = len([client for client in convertedToClients if client.fromSource == 12])
+        videoSignup = len([client for client in dealedClients if client.fromSource == 12])
+
+        data = {
+            "date": date,
+            "shanghaiCount": shanghaiCount,
+            "beijingCount": beijingCount,
+            "guangzhouCount": guangzhouCount,
+            "chengduCount": chengduCount,
+            "totalToClient": totalToClient,
+            "totalDealed": totalDealed,
+            "bwAdd": bwAdd,
+            "bwSignup": bwSignup,
+            "redAdd": redAdd,
+            "redSignup": redSignup,
+            "infoAdd": infoAdd,
+            "infoSignup": infoSignup,
+            "dpAdd": dpAdd,
+            "dpSignup": dpSignup,
+            "phoneAdd": phoneAdd,
+            "phoneSignup": phoneSignup,
+            "xhsAdd": xhsAdd,
+            "xhsSignup": xhsSignup,
+            "dyAdd": dyAdd,
+            "dySignup": dySignup,
+            "referAdd": referAdd,
+            "referSignup": referSignup,
+            "selfAdd": selfAdd,
+            "selfSignup": selfSignup,
+            "mpAdd": mpAdd,
+            "mpSignup": mpSignup,
+            "videoAdd": videoAdd,
+            "videoSignup": videoSignup,
+        }
+
+        return jsonify({
+            "status": 200,
+            "message": "数据获取成功",
+            "data": data
+        })
+    except Exception as e:
+        print(e)
+        return jsonify({
+            "status": 500,
+            "message": f"获取数据失败：{str(e)}"
+        })

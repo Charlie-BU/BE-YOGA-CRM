@@ -510,6 +510,7 @@ async def convertToClients(request):
         clients = session.query(Client).filter(Client.id.in_(ids)).all()
         for client in clients:
             client.clientStatus = 3  # 将状态改为正式客户
+            client.toClientTime = datetime.now()
             # 记录操作日志
             log = Log(operatorId=userId, operation=f"线索：{client.name}转为正式客户")
             session.add(log)

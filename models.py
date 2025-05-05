@@ -141,6 +141,9 @@ class Client(Base):
     # 客户备注
     info = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
 
+    # 转客户时间
+    toClientTime = Column(DateTime, nullable=True)
+
     # 预约人
     appointerId = Column(Integer, nullable=True)
 
@@ -197,7 +200,7 @@ class Client(Base):
     # 合同编号
     contractNo = Column(Text, nullable=True)
     # 成单时间
-    cooperateTime = Column(DateTime, nullable=True, default=datetime.now)
+    cooperateTime = Column(DateTime, nullable=True)
     # 已学总课时：周
     learnedWeeks = Column(Float, nullable=True, default=0.0)
     # 入住宿舍床
@@ -227,6 +230,7 @@ class Client(Base):
             "creatorName": self.creatorName,
             "createdTime": self.createdTime,
             "info": self.info,
+            "toClientTime": self.toClientTime,
             "appointerId": self.appointerId,
             "appointerName": self.appointerName,
             "schoolId": self.schoolId,
