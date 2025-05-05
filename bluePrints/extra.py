@@ -46,7 +46,7 @@ async def getClueClients(request):
     offset = (int(page_index) - 1) * int(page_size)
 
     # 构建查询
-    query = session.query(Client).order_by(Client.clientStatus, Client.createdTime.desc())
+    query = session.query(Client).order_by(Client.createdTime.desc(), Client.clientStatus)
 
     # 添加筛选条件
     if data.get("name"):
@@ -542,6 +542,10 @@ async def submitReserve(request):
     clientId = data.get("clientId")
     client = session.query(Client).get(clientId)
     appointerId = data.get("appointerId")
+    try:
+        appointerId = int(appointerId)
+    except Exception:
+        appointerId = None
     appointDate = data.get("appointDate")
     if appointDate:
         # 日期格式处理
