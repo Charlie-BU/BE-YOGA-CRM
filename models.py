@@ -617,6 +617,29 @@ class Bed(Base):
         return data
 
 
+class ClientLog(Base):
+    __tablename__ = "client_log"
+    id = Column(Integer, primary_key=True)
+    clientId = Column(Integer, ForeignKey("client.id"), nullable=True)
+    client = relationship("Client", backref="hisLogs")
+    operatorId = Column(Integer, ForeignKey("user.id"), nullable=True)
+    operator = relationship("User", backref="hisClientLogs")
+    operation = Column(Text, nullable=True)
+    time = Column(DateTime, default=datetime.now)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "clientId": self.clientId,
+            "clientName": self.client.name,
+            "operatorId": self.operatorId,
+            "operatorName": self.operator.username,
+            "operation": self.operation,
+            "time": self.time,
+        }
+        return data
+
+
 class Log(Base):
     __tablename__ = "log"
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -607,6 +607,9 @@ async def assignBed(request):
         student.bedCheckInDate = datetime.now().date()
         log = Log(operatorId=userId, operation=f"学员：{student.name}入住")
         session.add(log)
+        logContent = "学员入住宿舍"
+        clientLog = ClientLog(clientId=student.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
 
         return jsonify({
@@ -661,7 +664,9 @@ async def checkOut(request):
         # 添加操作日志
         log = Log(operatorId=userId, operation=f"学员：{student_name}离住")
         session.add(log)
-
+        logContent = "学员离住"
+        clientLog = ClientLog(clientId=student.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
         return jsonify({
             "status": 200,

@@ -908,6 +908,9 @@ async def addStudent(request):
             client.lessonIds = []
         client.lessonIds.append(lessonId)
 
+        logContent = f"班级：{lesson.name}添加学员"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
 
         return jsonify({
@@ -957,6 +960,9 @@ async def removeStudent(request):
         # 从学员的课程列表中移除该课程
         if client.lessonIds and lessonId in client.lessonIds:
             client.lessonIds.remove(lessonId)
+            logContent = f"课程：{session.query(Lesson).get(lessonId).name}移除学员"
+            clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+            session.add(clientLog)
             session.commit()
             return jsonify({
                 "status": 200,

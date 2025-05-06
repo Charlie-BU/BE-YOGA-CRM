@@ -1,3 +1,4 @@
+import datetime
 import json
 import time
 
@@ -264,6 +265,7 @@ async def updateClient(request):
                     })
 
         # 更新客户信息
+        changes = []
         for key, value in data.items():
             if value == "null" or not value:
                 continue
@@ -271,14 +273,21 @@ async def updateClient(request):
                 try:
                     if key == "info":
                         client.info.append(value)
+                        changes.append(f"添加备注: {value}")
                         continue
-                    setattr(client, key, value)
+
+                    old_value = getattr(client, key)
+                    if str(old_value) != str(value):  # 确认真的有改动
+                        setattr(client, key, value)
+                        changes.append(f"{key}: '{old_value}' -> '{value}'")
                 except Exception as e:
                     continue
-
+        logContent = f"更新客户信息：" + "；".join(changes) if changes else "（无修改）"
         log = Log(operatorId=userId,
-                  operation=f"更新客户信息：{client.name}")
+                  operation=logContent)
+        clientLog = ClientLog(clientId=client_id, operatorId=userId, operation=logContent)
         session.add(log)
+        session.add(clientLog)
         session.commit()
         return jsonify({
             "status": 200,
@@ -379,9 +388,12 @@ async def deleteClient(request):
             })
         # 删除客户
         session.delete(client)
+        logContent = f"删除客户"
         log = Log(operatorId=userId,
-                  operation=f"删除客户：{client.name}")
+                  operation=logContent)
         session.add(log)
+        clientLog = ClientLog(clientId=client_id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
         return jsonify({
             "status": 200,
@@ -426,6 +438,10 @@ async def unassignClients(request):
         log = Log(operatorId=userId,
                   operation=f"取消分配客户：{[client.name for client in session.query(Client).filter(Client.id.in_(client_ids)).all()]}")
         session.add(log)
+        for client_id in client_ids:
+            logContent = "取消分配"
+            clientLog = ClientLog(clientId=client_id, operatorId=userId, operation=logContent)
+            session.add(clientLog)
         session.commit()
 
         return jsonify({
@@ -478,6 +494,10 @@ async def assignClients(request):
         log = Log(operatorId=userId,
                   operation=f"分配客户：{[client.name for client in session.query(Client).filter(Client.id.in_(client_ids)).all()]}")
         session.add(log)
+        for client_id in client_ids:
+            logContent = f"分配客服：{assigned_user.username}"
+            clientLog = ClientLog(clientId=client_id, operatorId=userId, operation=logContent)
+            session.add(clientLog)
         session.commit()
         return jsonify({
             "status": 200,
@@ -514,7 +534,9 @@ async def convertToClients(request):
             # 记录操作日志
             log = Log(operatorId=userId, operation=f"线索：{client.name}转为正式客户")
             session.add(log)
-
+            logContent = "线索转为正式客户"
+            clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+            session.add(clientLog)
         session.commit()
         return jsonify({
             "status": 200,
@@ -562,11 +584,12 @@ async def submitReserve(request):
         nextTalkDate = datetime.strptime(nextTalkDate, '%m/%d/%Y')
     info = data.get("info")
     try:
-        if client.clientStatus == 4:
-            return jsonify({
-                "status": -2,
-                "message": "客户已预约"
-            })
+        # 允许重复预约
+        # if client.clientStatus == 4:
+        #     return jsonify({
+        #         "status": -2,
+        #         "message": "客户已预约"
+        #     })
         client.clientStatus = 4
         client.appointerId = appointerId
         client.appointDate = appointDate if appointDate else None
@@ -576,6 +599,9 @@ async def submitReserve(request):
         client.processStatus = 1
         log = Log(operatorId=userId, operation=f"客户：{client.name}预约到店")
         session.add(log)
+        logContent = "客户预约"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
         return jsonify({
             "status": 200,
@@ -619,6 +645,9 @@ async def cancelReserve(request):
         # 记录操作日志
         log = Log(operatorId=userId, operation=f"客户：{client.name}取消预约")
         session.add(log)
+        logContent = "取消预约"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
         return jsonify({
             "status": 200,
@@ -668,6 +697,9 @@ async def confirmCooperation(request):
         # 记录操作日志
         log = Log(operatorId=userId, operation=f"客户：{client.name}确认成单，合同编号：{contractNo}")
         session.add(log)
+        logContent = f"确认成单，合同编号：{contractNo}"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
 
         return jsonify({
@@ -711,6 +743,9 @@ async def cancelCooperation(request):
         # 记录操作日志
         log = Log(operatorId=userId, operation=f"客户：{client.name}取消成单")
         session.add(log)
+        logContent = "取消成单"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
 
         return jsonify({
@@ -759,6 +794,9 @@ async def graduateClient(request):
         # 记录操作日志
         log = Log(operatorId=userId, operation=f"学员：{client.name}已毕业")
         session.add(log)
+        logContent = "学员毕业"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
 
         return jsonify({
@@ -807,6 +845,9 @@ async def cancelGraduate(request):
         # 记录操作日志
         log = Log(operatorId=userId, operation=f"客户：{client.name}取消毕业")
         session.add(log)
+        logContent = "学员取消毕业"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
 
         return jsonify({
@@ -939,14 +980,16 @@ async def submitPayment(request):
 
     data = request.json()
     try:
+        amount = int(data.get("amount"))
         # 创建支付记录
         payment = Payment(
             clientId=data.get("clientId"),
             teacherId=data.get("teacherId"),
-            amount=data.get("amount"),
+            amount=amount,
             category=data.get("category"),  # 1为定金，2为尾款，3为其他
             paymentMethod=data.get("paymentMethod"),
-            info=data.get("info")
+            info=data.get("info"),
+            paymentDate=datetime.now().date()
         )
         session.add(payment)
 
@@ -956,9 +999,15 @@ async def submitPayment(request):
         payType = "交定金" if data.get("category") == 1 else "交尾款" if data.get("category") == 2 else "付款"
         log = Log(
             operatorId=userId,
-            operation=f"客户：{client.name}{payType}{data.get('amount')}元，负责老师：{teacher.username}"
+            operation=f"客户：{client.name}{payType}{amount}元，负责老师：{teacher.username}"
         )
         session.add(log)
+        if amount > 0:
+            logContent = f"{payType}{amount}元，负责老师：{teacher.username}"
+        else:
+            logContent = f"退款{-1 * amount}元，负责老师：{teacher.username}"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
         session.commit()
 
         return jsonify({
@@ -1257,3 +1306,42 @@ async def getLogs(request):
         "logs": logs,
         "total": total
     })
+
+
+@extraRouter.post("/getClientLogs")
+async def getClientLogs(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    clientId = data.get("clientId")
+    page_index = data.get("pageIndex", 1)
+    page_size = data.get("pageSize", 10)
+    offset = (int(page_index) - 1) * int(page_size)
+    try:
+        # 构建查询
+        query = session.query(ClientLog).filter(ClientLog.clientId == clientId).order_by(ClientLog.time.desc())
+        # 获取分页数据
+        clientLogs = query.offset(offset).limit(page_size).all()
+        logs = [log.to_json() for log in clientLogs]
+
+        # 获取总数
+        total = query.count()
+        return jsonify({
+            "status": 200,
+            "message": "获取日志成功",
+            "logs": logs,
+            "total": total
+        })
+    except Exception as e:
+        print(e)
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "日志获取失败"
+        })
