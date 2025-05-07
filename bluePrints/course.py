@@ -547,7 +547,7 @@ async def getLessonsByIds(request):
         })
 
     data = request.json()
-    lessonIds = data.get("lessonIds", [])
+    lessonIds = data.get("lessonIds", "[]")
     lessonIds = json.loads(lessonIds)
 
     try:

@@ -220,6 +220,32 @@ async def getDealedClients(request):
         "total": total
     })
 
+@extraRouter.post("/getClassStudents")
+async def getClassStudents(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    data = request.json()
+    stuId = data.get("stuId")
+    student = session.query(Client).get(stuId)
+    stuInfo = {
+        "id": stuId,
+        "name": student.name,
+        "gender": student.gender,
+        "phone": student.phone,
+        "weixin": student.weixin,
+        "cooperateTime": student.cooperateTime,
+    }
+    return jsonify({
+        "status": 200,
+        "message": "客户信息获取成功",
+        "stuInfo": stuInfo,
+    })
+
 
 @extraRouter.post("/updateClient")
 async def updateClient(request):
