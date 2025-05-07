@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import date
 
 from robyn import SubRouter, jsonify
 from sqlalchemy import func, text
@@ -563,7 +564,6 @@ async def getLessonsByIds(request):
         })
 
 
-
 @courseRouter.post("/getLessonClients")
 async def getLessonClients(request):
     sessionid = request.headers.get("sessionid")
@@ -980,3 +980,53 @@ async def removeStudent(request):
             "status": 500,
             "message": f"移除失败：{str(e)}"
         })
+
+
+# 获取学生课程信息
+@courseRouter.post("/getStudentCourses")
+async def getStudentCourses(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    data = request.json()
+    stuId = data.get("stuId")
+    student = session.query(Client).get(stuId)
+    # 提取课程和课程记录
+    courseIds = set(student.courseIds or [])
+    lessonIds = student.lessonIds or []
+    lessons = session.query(Lesson).filter(Lesson.id.in_(lessonIds)).all()
+
+    lessonCourseMap = {lesson.courseId: lesson for lesson in lessons}
+    lessonCourseIds = set(lessonCourseMap.keys())
+    today = date.today()
+
+    # 分类
+    ongoingCourseIds = {
+        cid for cid, lesson in lessonCourseMap.items()
+        if (lesson.endDate and lesson.startDate <= today <= lesson.endDate) or (not lesson.endDate and lesson.startDate <= today)
+    }
+
+    notStartedCourseIds = courseIds - lessonCourseIds
+    finishedCourseIds = courseIds - ongoingCourseIds - notStartedCourseIds
+
+    # 一次性查出所有涉及的课程
+    allRelatedCourseIds = courseIds
+    courses = session.query(Course).filter(Course.id.in_(allRelatedCourseIds)).all()
+    courseIdNameMap = {c.id: c.name for c in courses}
+
+    # 构造结果
+    finishedCourseNames = "，".join([courseIdNameMap[cid] for cid in finishedCourseIds if cid in courseIdNameMap])
+    ongoingCourseNames = "，".join([courseIdNameMap[cid] for cid in ongoingCourseIds if cid in courseIdNameMap])
+    notStartedCourseNames = "，".join([courseIdNameMap[cid] for cid in notStartedCourseIds if cid in courseIdNameMap])
+
+    return jsonify({
+        "status": 200,
+        "message": "学生课程信息获取成功",
+        "finishedCourseNames": finishedCourseNames,
+        "ongoingCourseNames": ongoingCourseNames,
+        "notStartedCourseNames": notStartedCourseNames
+    })

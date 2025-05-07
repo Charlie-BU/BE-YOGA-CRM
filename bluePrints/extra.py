@@ -220,6 +220,7 @@ async def getDealedClients(request):
         "total": total
     })
 
+
 @extraRouter.post("/getClassStudents")
 async def getClassStudents(request):
     sessionid = request.headers.get("sessionid")
@@ -292,6 +293,18 @@ async def updateClient(request):
 
         # 更新客户信息
         changes = []
+        fieldsToSave = {
+            "name": "姓名",
+            "gender": "性别",
+            "age": "年龄",
+            "phone": "电话",
+            "QQ": "QQ",
+            "douyin": "抖音",
+            "rednote": "小红书",
+            "shangwutong": "商务通",
+            "IDNumber": "身份证",
+            "address": "地区"
+        }
         for key, value in data.items():
             if value == "null" or not value:
                 continue
@@ -305,7 +318,8 @@ async def updateClient(request):
                     old_value = getattr(client, key)
                     if str(old_value) != str(value):  # 确认真的有改动
                         setattr(client, key, value)
-                        changes.append(f"{key}: '{old_value}' -> '{value}'")
+                        if key in fieldsToSave.keys():
+                            changes.append(f"{fieldsToSave[key]}: {old_value} -> {value}")
                 except Exception as e:
                     continue
         logContent = f"更新客户信息：" + "；".join(changes) if changes else "（无修改）"
