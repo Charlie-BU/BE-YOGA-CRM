@@ -1,8 +1,10 @@
 import json
 import time
+from datetime import timedelta
 
 from robyn import SubRouter, jsonify
 from sqlalchemy import func, text
+from sqlalchemy.orm import joinedload
 
 from models import *
 from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
@@ -677,4 +679,52 @@ async def checkOut(request):
         return jsonify({
             "status": 500,
             "message": f"离住失败：{str(e)}"
+        })
+
+
+# 获取已超期的床位和学员
+@dormRouter.post("/getOverdueBeds")
+async def getOverdueBeds(request):
+    sessionid = request.headers.get("sessionid")
+    user_info = checkSessionid(sessionid)
+    userId = user_info.get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    try:
+        today = datetime.now().date()
+        # 预加载 clients，防止 lazy load
+        beds = session.query(Bed).options(joinedload(Bed.clients)).filter(Bed.clients is not None).all()
+        result = []
+        for bed in beds:
+            if not bed.clients:
+                continue  # 安全检查
+            client = bed.clients[-1]  # 默认取最后入住者
+            check_in_date = client.bedCheckInDate
+            duration_weeks = bed.duration or 0
+            expected_checkout = check_in_date + timedelta(weeks=duration_weeks)
+
+            if today > expected_checkout:
+                overdue_days = (today - expected_checkout).days
+                result.append({
+                    "bedId": bed.id,
+                    "clientId": client.id,
+                    "clientName": client.name,
+                    "dormName": bed.room.dormitory.name,
+                    "roomNumber": bed.room.roomNumber,
+                    "bedNumber": bed.bedNumber,
+                    "bedCheckInDate": check_in_date,
+                    "overdueDays": overdue_days
+                })
+        return jsonify({
+            "status": 200,
+            "result": result
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"获取失败：{str(e)}"
         })

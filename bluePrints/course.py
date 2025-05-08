@@ -514,17 +514,50 @@ async def getLessons(request):
     pageIndex = data.get("pageIndex", 1)
     pageSize = data.get("pageSize", 10)
 
+    # 获取筛选条件
+    name = data.get("name")
+    courseName = data.get("courseName")
     schoolId = data.get("schoolId")
+    category = data.get("category")
+    chiefTeacherName = data.get("chiefTeacherName")
+    classTeacherName = data.get("classTeacherName")
+    teachingAssistantName = data.get("teachingAssistantName")
+    startDate = data.get("startDate")
+    endDate = data.get("endDate")
+
     try:
         query = session.query(Lesson)
+
+        # 添加筛选条件
+        if name:
+            query = query.filter(Lesson.name.like(f"%{name}%"))
+        if courseName:
+            query = query.join(Lesson.course).filter(Course.name.like(f"%{courseName}%"))
         if schoolId:
             query = query.join(Lesson.course).filter(Course.schoolId == schoolId)
+        if category:
+            query = query.join(Lesson.course).filter(Course.category == category)
+        if chiefTeacherName:
+            chiefTeacher = session.query(User).filter(User.username.like(f"%{chiefTeacherName}%")).first()
+            if chiefTeacher:
+                query = query.filter(Lesson.chiefTeacherId == chiefTeacher.id)
+        if classTeacherName:
+            classTeacher = session.query(User).filter(User.username.like(f"%{classTeacherName}%")).first()
+            if classTeacher:
+                query = query.filter(Lesson.classTeacherId == classTeacher.id)
+        if teachingAssistantName:
+            query = query.filter(Lesson.teachingAssistantName.like(f"%{teachingAssistantName}%"))
+        if startDate:
+            query = query.filter(Lesson.startDate >= startDate)
+        if endDate:
+            query = query.filter(Lesson.startDate <= endDate)
 
         total = query.count()
         lessons = query.order_by(Lesson.startDate, Lesson.id.desc()) \
             .offset((int(pageIndex) - 1) * int(pageSize)) \
             .limit(pageSize) \
             .all()
+
         return jsonify({
             "status": 200,
             "lessons": [lesson.to_json() for lesson in lessons],
@@ -643,7 +676,7 @@ async def addLesson(request):
             courseId=data['courseId'],
             chiefTeacherId=data['chiefTeacherId'],
             classTeacherId=data.get('classTeacherId') if data.get('classTeacherId') else None,
-            teachingAssistantId=data.get('teachingAssistantId') if data.get('teachingAssistantId') else None,
+            teachingAssistantName=data.get('teachingAssistantName'),
             startDate=data['startDate'],  # 添加开课日期
             endDate=data.get('endDate'),  # 添加结课日期（可选）
             info=data.get('info', ''),
@@ -699,7 +732,7 @@ async def updateLesson(request):
         # 更新班级信息
         update_fields = [
             'name', 'courseId', 'schoolId', 'chiefTeacherId',
-            'classTeacherId', 'teachingAssistantId', 'info',
+            'classTeacherId', 'teachingAssistantName', 'info',
             'startDate', 'endDate'  # 添加开课和结课日期字段
         ]
         for field in update_fields:
@@ -994,39 +1027,48 @@ async def getStudentCourses(request):
         })
     data = request.json()
     stuId = data.get("stuId")
-    student = session.query(Client).get(stuId)
-    # 提取课程和课程记录
-    courseIds = set(student.courseIds or [])
-    lessonIds = student.lessonIds or []
-    lessons = session.query(Lesson).filter(Lesson.id.in_(lessonIds)).all()
+    try:
+        student = session.query(Client).get(stuId)
+        # 提取课程和课程记录
+        courseIds = set(student.courseIds or [])
+        lessonIds = student.lessonIds or []
+        lessons = session.query(Lesson).filter(Lesson.id.in_(lessonIds)).all()
 
-    lessonCourseMap = {lesson.courseId: lesson for lesson in lessons}
-    lessonCourseIds = set(lessonCourseMap.keys())
-    today = date.today()
+        lessonCourseMap = {lesson.courseId: lesson for lesson in lessons}
+        lessonCourseIds = set(lessonCourseMap.keys())
+        today = date.today()
 
-    # 分类
-    ongoingCourseIds = {
-        cid for cid, lesson in lessonCourseMap.items()
-        if (lesson.endDate and lesson.startDate <= today <= lesson.endDate) or (not lesson.endDate and lesson.startDate <= today)
-    }
+        # 分类
+        ongoingCourseIds = {
+            cid for cid, lesson in lessonCourseMap.items()
+            if (lesson.endDate and lesson.startDate <= today <= lesson.endDate) or (
+                    not lesson.endDate and lesson.startDate <= today)
+        }
 
-    notStartedCourseIds = courseIds - lessonCourseIds
-    finishedCourseIds = courseIds - ongoingCourseIds - notStartedCourseIds
+        notStartedCourseIds = courseIds - lessonCourseIds
+        finishedCourseIds = courseIds - ongoingCourseIds - notStartedCourseIds
 
-    # 一次性查出所有涉及的课程
-    allRelatedCourseIds = courseIds
-    courses = session.query(Course).filter(Course.id.in_(allRelatedCourseIds)).all()
-    courseIdNameMap = {c.id: c.name for c in courses}
+        # 一次性查出所有涉及的课程
+        allRelatedCourseIds = courseIds
+        courses = session.query(Course).filter(Course.id.in_(allRelatedCourseIds)).all()
+        courseIdNameMap = {c.id: c.name for c in courses}
 
-    # 构造结果
-    finishedCourseNames = "，".join([courseIdNameMap[cid] for cid in finishedCourseIds if cid in courseIdNameMap])
-    ongoingCourseNames = "，".join([courseIdNameMap[cid] for cid in ongoingCourseIds if cid in courseIdNameMap])
-    notStartedCourseNames = "，".join([courseIdNameMap[cid] for cid in notStartedCourseIds if cid in courseIdNameMap])
+        # 构造结果
+        finishedCourseNames = "，".join([courseIdNameMap[cid] for cid in finishedCourseIds if cid in courseIdNameMap])
+        ongoingCourseNames = "，".join([courseIdNameMap[cid] for cid in ongoingCourseIds if cid in courseIdNameMap])
+        notStartedCourseNames = "，".join(
+            [courseIdNameMap[cid] for cid in notStartedCourseIds if cid in courseIdNameMap])
 
-    return jsonify({
-        "status": 200,
-        "message": "学生课程信息获取成功",
-        "finishedCourseNames": finishedCourseNames,
-        "ongoingCourseNames": ongoingCourseNames,
-        "notStartedCourseNames": notStartedCourseNames
-    })
+        return jsonify({
+            "status": 200,
+            "message": "学生课程信息获取成功",
+            "finishedCourseNames": finishedCourseNames,
+            "ongoingCourseNames": ongoingCourseNames,
+            "notStartedCourseNames": notStartedCourseNames
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "学生课程信息获取失败"
+        })

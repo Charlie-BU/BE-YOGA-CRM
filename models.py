@@ -406,15 +406,7 @@ class Lesson(Base):
             return ""
 
     # 助教
-    teachingAssistantId = Column(Integer, nullable=True)
-
-    @property
-    def teachingAssistantName(self):
-        teachingAssistant = session.query(User).get(self.teachingAssistantId)
-        if teachingAssistant:
-            return teachingAssistant.username
-        else:
-            return ""
+    teachingAssistantName = Column(Text, nullable=True)
 
     info = Column(Text, nullable=True)
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
@@ -434,7 +426,6 @@ class Lesson(Base):
             "chiefTeacherName": self.chiefTeacherName,
             "classTeacherId": self.classTeacherId,
             "classTeacherName": self.classTeacherName,
-            "teachingAssistantId": self.teachingAssistantId,
             "teachingAssistantName": self.teachingAssistantName,
             "info": self.info,
             "createdTime": self.createdTime,
