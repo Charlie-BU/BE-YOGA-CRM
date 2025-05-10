@@ -725,3 +725,364 @@ async def getDateSummaryDataPerDay(request):
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
         })
+
+
+@userRouter.post("/getCustomerServiceLeadsData")
+async def getCustomerServiceLeadsData(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    schoolId = data.get("schoolId")
+    startDate = data.get("startDate")
+    endDate = data.get("endDate")
+
+    try:
+        user_query = session.query(User)
+        if schoolId:
+            users = user_query.filter(User.schoolId == schoolId).order_by(User.schoolId).all()
+        else:
+            users = user_query.order_by(User.schoolId).all()
+        allData = []
+        for user in users:
+            query = session.query(Client).filter(Client.creatorId == user.id)
+            if startDate:
+                query = query.filter(Client.createdTime >= startDate)
+            if endDate:
+                query = query.filter(Client.createdTime <= endDate)
+            total = query.count()
+
+            phone = query.filter(Client.fromSource == 2).count()
+            dp = query.filter(Client.fromSource == 7).count()
+            bw = query.filter(Client.fromSource == 1).count()
+            xhs = query.filter(Client.fromSource == 8).count()
+            red = query.filter(Client.fromSource.in_([10, 20])).count()
+            dy = query.filter(Client.fromSource == 9).count()
+            gd = query.filter(Client.fromSource == 21).count()
+            refer = query.filter(Client.fromSource.in_([3, 27])).count()
+            mp = query.filter(Client.fromSource == 11).count()
+            video = query.filter(Client.fromSource == 12).count()
+            info = query.filter(Client.fromSource.in_([14, 16, 18, 19, 22])).count()
+            ks = query.filter(Client.fromSource == 13).count()
+            live = query.filter(Client.fromSource == 15).count()
+            zl = query.filter(Client.fromSource == 15).count()  # duplicated source
+            self = query.filter(Client.fromSource == 4).count()
+            ksInfo = query.filter(Client.fromSource == 22).count()  # also in `info`
+            coop = query.filter(Client.fromSource == 28).count()
+            gdt = query.filter(Client.fromSource.in_([23, 24])).count()
+            optim = query.filter(Client.fromSource == 5).count()
+
+            # Remove duplicates (like zl, ksInfo already counted in `info`)
+            other = total - (
+                    phone + dp + bw + xhs + red + dy + gd + refer + mp + video +
+                    info + ks + live + self + coop + gdt + optim
+            )
+
+            allData.append({
+                "userId": user.id,
+                "username": user.username,
+                "schoolName": user.school.name,
+                "total": total,
+                "phone": phone,
+                "dp": dp,
+                "bw": bw,
+                "xhs": xhs,
+                "red": red,
+                "dy": dy,
+                "gd": gd,
+                "refer": refer,
+                "mp": mp,
+                "video": video,
+                "info": info,
+                "ks": ks,
+                "live": live,
+                "zl": zl,  # might be a dupe of live
+                "self": self,
+                "ksInfo": ksInfo,  # dupe of info if 22 is double-counted
+                "coop": coop,
+                "gdt": gdt,
+                "optim": optim,
+                "other": other
+            })
+
+        return jsonify({
+            "status": 200,
+            "message": "数据获取成功",
+            "allData": allData
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取数据失败：{str(e)}"
+        })
+
+
+@userRouter.post("/getCustomerServiceConversionData")
+async def getCustomerServiceConversionData(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    schoolId = data.get("schoolId")
+    startDate = data.get("startDate")
+    endDate = data.get("endDate")
+
+    try:
+        user_query = session.query(User)
+        if schoolId:
+            users = user_query.filter(User.schoolId == schoolId).order_by(User.schoolId).all()
+        else:
+            users = user_query.order_by(User.schoolId).all()
+        allData = []
+        for user in users:
+            # 已转客户
+            query = session.query(Client).filter(Client.affiliatedUserId == user.id, Client.clientStatus >= 3)
+            if startDate:
+                query = query.filter(Client.createdTime >= startDate)
+            if endDate:
+                query = query.filter(Client.createdTime <= endDate)
+            total = query.count()
+
+            phone = query.filter(Client.fromSource == 2).count()
+            dp = query.filter(Client.fromSource == 7).count()
+            bw = query.filter(Client.fromSource == 1).count()
+            xhs = query.filter(Client.fromSource == 8).count()
+            red = query.filter(Client.fromSource.in_([10, 20])).count()
+            dy = query.filter(Client.fromSource == 9).count()
+            gd = query.filter(Client.fromSource == 21).count()
+            refer = query.filter(Client.fromSource.in_([3, 27])).count()
+            mp = query.filter(Client.fromSource == 11).count()
+            video = query.filter(Client.fromSource == 12).count()
+            info = query.filter(Client.fromSource.in_([14, 16, 18, 19, 22])).count()
+            ks = query.filter(Client.fromSource == 13).count()
+            live = query.filter(Client.fromSource == 15).count()
+            zl = query.filter(Client.fromSource == 15).count()  # duplicated source
+            self = query.filter(Client.fromSource == 4).count()
+            ksInfo = query.filter(Client.fromSource == 22).count()  # also in `info`
+            coop = query.filter(Client.fromSource == 28).count()
+            gdt = query.filter(Client.fromSource.in_([23, 24])).count()
+            optim = query.filter(Client.fromSource == 5).count()
+
+            # Remove duplicates (like zl, ksInfo already counted in `info`)
+            other = total - (
+                    phone + dp + bw + xhs + red + dy + gd + refer + mp + video +
+                    info + ks + live + self + coop + gdt + optim
+            )
+
+            allData.append({
+                "userId": user.id,
+                "username": user.username,
+                "schoolName": user.school.name,
+                "total": total,
+                "phone": phone,
+                "dp": dp,
+                "bw": bw,
+                "xhs": xhs,
+                "red": red,
+                "dy": dy,
+                "gd": gd,
+                "refer": refer,
+                "mp": mp,
+                "video": video,
+                "info": info,
+                "ks": ks,
+                "live": live,
+                "zl": zl,  # might be a dupe of live
+                "self": self,
+                "ksInfo": ksInfo,  # dupe of info if 22 is double-counted
+                "coop": coop,
+                "gdt": gdt,
+                "optim": optim,
+                "other": other
+            })
+
+        return jsonify({
+            "status": 200,
+            "message": "数据获取成功",
+            "allData": allData
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取数据失败：{str(e)}"
+        })
+
+
+@userRouter.post("/getCustomerServiceDailyData")
+async def getCustomerServiceDailyData(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    schoolId = data.get("schoolId")
+    startDate = data.get("startDate")
+    endDate = data.get("endDate")
+
+    try:
+        user_query = session.query(User)
+        if schoolId:
+            users = user_query.filter(User.schoolId == schoolId).order_by(User.schoolId).all()
+        else:
+            users = user_query.order_by(User.schoolId).all()
+        allData = []
+        for user in users:
+            # 已成单客户
+            query = session.query(Client).filter(Client.affiliatedUserId == user.id, Client.processStatus == 2)
+            if startDate:
+                query = query.filter(Client.createdTime >= startDate)
+            if endDate:
+                query = query.filter(Client.createdTime <= endDate)
+            total = query.count()
+
+            phone = query.filter(Client.fromSource == 2).count()
+            dp = query.filter(Client.fromSource == 7).count()
+            bw = query.filter(Client.fromSource == 1).count()
+            xhs = query.filter(Client.fromSource == 8).count()
+            red = query.filter(Client.fromSource.in_([10, 20])).count()
+            dy = query.filter(Client.fromSource == 9).count()
+            gd = query.filter(Client.fromSource == 21).count()
+            refer = query.filter(Client.fromSource.in_([3, 27])).count()
+            mp = query.filter(Client.fromSource == 11).count()
+            video = query.filter(Client.fromSource == 12).count()
+            info = query.filter(Client.fromSource.in_([14, 16, 18, 19, 22])).count()
+            ks = query.filter(Client.fromSource == 13).count()
+            live = query.filter(Client.fromSource == 15).count()
+            zl = query.filter(Client.fromSource == 15).count()  # duplicated source
+            self = query.filter(Client.fromSource == 4).count()
+            ksInfo = query.filter(Client.fromSource == 22).count()  # also in `info`
+            coop = query.filter(Client.fromSource == 28).count()
+            gdt = query.filter(Client.fromSource.in_([23, 24])).count()
+            optim = query.filter(Client.fromSource == 5).count()
+
+            # Remove duplicates (like zl, ksInfo already counted in `info`)
+            other = total - (
+                    phone + dp + bw + xhs + red + dy + gd + refer + mp + video +
+                    info + ks + live + self + coop + gdt + optim
+            )
+
+            allData.append({
+                "userId": user.id,
+                "username": user.username,
+                "schoolName": user.school.name,
+                "total": total,
+                "phone": phone,
+                "dp": dp,
+                "bw": bw,
+                "xhs": xhs,
+                "red": red,
+                "dy": dy,
+                "gd": gd,
+                "refer": refer,
+                "mp": mp,
+                "video": video,
+                "info": info,
+                "ks": ks,
+                "live": live,
+                "zl": zl,  # might be a dupe of live
+                "self": self,
+                "ksInfo": ksInfo,  # dupe of info if 22 is double-counted
+                "coop": coop,
+                "gdt": gdt,
+                "optim": optim,
+                "other": other
+            })
+
+        return jsonify({
+            "status": 200,
+            "message": "数据获取成功",
+            "allData": allData
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取数据失败：{str(e)}"
+        })
+
+
+@userRouter.post("/getStuffPerformanceByClient")
+async def getStuffPerformanceByClient(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    schoolId = data.get("schoolId")
+    startDate = data.get("startDate")
+    endDate = data.get("endDate")
+
+    try:
+        allData = []
+        # 成单客户
+        client_query = session.query(Client).join(Client.affiliatedUser).filter(Client.processStatus == 2)
+        if startDate:
+            client_query = client_query.filter(Client.cooperateTime >= startDate)
+        if endDate:
+            client_query = client_query.filter(Client.cooperateTime <= endDate)
+        if schoolId:
+            clients = client_query.filter(User.schoolId == schoolId).all()
+        else:
+            clients = client_query.order_by(User.schoolId).all()
+
+        for client in clients:
+            cardType = client.courseNames
+            if client.comboId:
+                cardType = session.query(CourseCombo).get(client.comboId).name
+            mainTeacher = ""
+            if client.lessonIds:
+                lessons = [session.query(Lesson).get(id) for id in client.lessonIds]
+                mainTeacher = "，".join(set([lesson.chiefTeacherName for lesson in lessons]))
+            hisPayments = session.query(Payment).filter(Payment.clientId == client.id).all()
+            wechat = sum(payment.amount for payment in hisPayments if payment.category == 2)
+            alipay = sum(payment.amount for payment in hisPayments if payment.category == 3)
+            posAccount = sum(payment.amount for payment in hisPayments if payment.category == 4)
+            toCompany = sum(payment.amount for payment in hisPayments if payment.category == 5)
+            cash = sum(payment.amount for payment in hisPayments if payment.category == 1)
+            bankCard = sum(payment.amount for payment in hisPayments if payment.category == 6)
+            remarks = " | ".join(reversed(client.info))
+
+            allData.append({
+                "schoolName": client.schoolName,
+                "signDate": client.cooperateTime.date(),
+                "cardType": cardType,
+                "customerName": client.name,
+                "teacher": client.affiliatedUser.username,
+                "mainTeacher": mainTeacher,
+                "area": client.address,
+                "channel": client.fromSource,
+                "wechat": wechat,
+                "alipay": alipay,
+                "posAccount": posAccount,
+                "toCompany": toCompany,
+                "cash": cash,
+                "bankCard": bankCard,
+                "remarks": remarks
+            })
+        return jsonify({
+            "status": 200,
+            "message": "数据获取成功",
+            "allData": allData
+        })
+    except Exception as e:
+        return jsonify({
+            "status": 500,
+            "message": f"获取数据失败：{str(e)}"
+        })

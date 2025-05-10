@@ -185,7 +185,7 @@ class Client(Base):
         courses = [session.query(Course).get(id) for id in self.courseIds]
         if courses:
             courseNames = [course.name for course in courses if course is not None]
-            return ", ".join(courseNames)
+            return "，".join(courseNames)
         return ""
 
     # 班级
