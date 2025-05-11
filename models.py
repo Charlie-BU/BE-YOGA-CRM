@@ -234,7 +234,8 @@ class Client(Base):
 
     # 班级
     lessonIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
-
+    # 已毕业的班级
+    graduatedLessonIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
     # 跟进状态：1未成单 / 2已成单
     processStatus = Column(Integer, nullable=True, default=1)
     # 预约日期
@@ -283,6 +284,7 @@ class Client(Base):
             "courseNames": self.courseNames,
             "comboId": self.comboId,
             "lessonIds": self.lessonIds,
+            "graduatedLessonIds": self.graduatedLessonIds,
             "processStatus": self.processStatus,
             "appointDate": self.appointDate,
             "nextTalkDate": self.nextTalkDate,
@@ -406,8 +408,6 @@ class Lesson(Base):
     startDate = Column(Date, nullable=True)
     # 结课日期
     endDate = Column(Date, nullable=True)
-    # 毕业人数
-    graduatedStuNumber = Column(Integer, nullable=True, default=0)
 
     @property
     def courseName(self):
@@ -465,7 +465,6 @@ class Lesson(Base):
             "endDate": self.endDate,
             "category": self.category,
             "schoolId": self.schoolId,
-            "graduatedStuNumber": self.graduatedStuNumber,
             "chiefTeacherId": self.chiefTeacherId,
             "chiefTeacherName": self.chiefTeacherName,
             "classTeacherId": self.classTeacherId,

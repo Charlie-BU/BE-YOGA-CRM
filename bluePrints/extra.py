@@ -346,6 +346,60 @@ async def updateClient(request):
         })
 
 
+@extraRouter.post("/addClientNote")
+async def addClientNote(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    if not checkUserAuthority(userId, 6):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
+
+    data = request.json()
+    client_id = data.get("studentId")  # 从请求中获取客户ID
+    note = data.get("note")  # 获取备注内容
+
+    try:
+        client = session.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            return jsonify({
+                "status": -2,
+                "message": "客户不存在"
+            })
+
+        # 添加备注到客户信息中
+        if not client.info:
+            client.info = []
+        client.info.append(note)
+
+        # 记录操作日志
+        logContent = f"添加备注：{note}"
+        log = Log(operatorId=userId, operation=logContent)
+        clientLog = ClientLog(clientId=client_id, operatorId=userId, operation=logContent)
+
+        session.add(log)
+        session.add(clientLog)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "添加备注成功"
+        })
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": -3,
+            "message": f"添加备注失败：{str(e)}"
+        })
+
+
 @extraRouter.post("/addClient")
 async def addClient(request):
     sessionid = request.headers.get("sessionid")

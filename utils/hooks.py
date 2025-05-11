@@ -84,6 +84,9 @@ def checkUserAuthority(userId, authorityId):
     user = session.query(User).get(userId)
     if not user:
         return False
+    # admin豁免
+    if user.usertype >= 2:
+        return True
     authority = user.authority
     if authorityId in authority:
         return True

@@ -669,6 +669,57 @@ async def getLessonClients(request):
         })
 
 
+@courseRouter.post("/getLessonGraduatedClients")
+async def getLessonGraduatedClients(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    lessonId = data.get("lessonId")
+    if lessonId is None:
+        return jsonify({
+            "status": -2,
+            "message": "缺少 lessonId 参数"
+        })
+
+    try:
+        lessonId = int(lessonId)
+        # 使用数据库函数直接过滤，提高性能
+        clients_data = []
+        clientsCooperated = session.query(Client).filter(
+            Client.processStatus == 2  # 已成单
+        ).all()
+
+        for client in clientsCooperated:
+            # 检查课程ID是否在客户的课程列表中
+            if client.graduatedLessonIds and lessonId in client.graduatedLessonIds:
+                clients_data.append({
+                    "id": client.id,
+                })
+        return jsonify({
+            "status": 200,
+            "message": "查询成功",
+            "total": len(clients_data),
+            "clients": clients_data
+        })
+    except ValueError:
+        return jsonify({
+            "status": 400,
+            "message": "班级ID格式错误"
+        })
+    except Exception as e:
+        print(f"获取班级学员失败: {str(e)}")
+        return jsonify({
+            "status": 500,
+            "message": f"查询失败：{str(e)}"
+        })
+
+
 @courseRouter.post("/addLesson")
 async def addLesson(request):
     sessionid = request.headers.get("sessionid")
@@ -843,52 +894,6 @@ async def deleteLesson(request):
         })
 
 
-@courseRouter.post("/updateGraduateNum")
-async def updateGraduateNum(request):
-    sessionid = request.headers.get("sessionid")
-    userId = checkSessionid(sessionid).get("userId")
-    if not userId:
-        return jsonify({
-            "status": -1,
-            "message": "用户未登录"
-        })
-
-    data = request.json()
-    lessonId = data.get("id")
-    graduatedStuNumber = data.get("graduatedStuNumber")
-
-    if not all([lessonId, graduatedStuNumber is not None]):
-        return jsonify({
-            "status": -2,
-            "message": "参数不完整"
-        })
-
-    try:
-        # 获取课程信息
-        lesson = session.query(Lesson).get(lessonId)
-        if not lesson:
-            return jsonify({
-                "status": -3,
-                "message": "班级不存在"
-            })
-
-        # 更新毕业人数
-        lesson.graduatedStuNumber = graduatedStuNumber
-        session.commit()
-
-        return jsonify({
-            "status": 200,
-            "message": "更新成功"
-        })
-
-    except Exception as e:
-        session.rollback()
-        return jsonify({
-            "status": 500,
-            "message": f"更新失败：{str(e)}"
-        })
-
-
 # 获取可加入班级的学员
 @courseRouter.post("/getQualifiedStudents")
 async def getQualifiedStudents(request):
@@ -1052,6 +1057,128 @@ async def removeStudent(request):
         return jsonify({
             "status": 500,
             "message": f"移除失败：{str(e)}"
+        })
+
+
+# 班级学员毕业
+@courseRouter.post("/graduateClient")
+async def graduateClient(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    if not checkUserAuthority(userId, 15):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
+    data = request.json()
+    stuId = data.get("clientId")
+    lessonId = data.get("lessonId")
+
+    if not all([stuId, lessonId]):
+        return jsonify({
+            "status": -2,
+            "message": "参数不完整"
+        })
+
+    try:
+        lessonId = int(lessonId)
+        # 获取学员信息
+        client = session.query(Client).get(stuId)
+        if not client:
+            return jsonify({
+                "status": -3,
+                "message": "学员不存在"
+            })
+
+        if not client.graduatedLessonIds:
+            client.graduatedLessonIds = []
+        if lessonId in client.graduatedLessonIds:
+            return jsonify({
+                "status": -4,
+                "message": "该学员在该课程已毕业，无法重复操作"
+            })
+        client.graduatedLessonIds.append(lessonId)
+
+        logContent = f"课程：{session.query(Lesson).get(lessonId).name}毕业"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "毕业成功"
+        })
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"毕业失败：{str(e)}"
+        })
+
+
+# 班级学员取消毕业
+@courseRouter.post("/ungraduateClient")
+async def ungraduateClient(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    if not checkUserAuthority(userId, 15):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
+    data = request.json()
+    stuId = data.get("clientId")
+    lessonId = data.get("lessonId")
+
+    if not all([stuId, lessonId]):
+        return jsonify({
+            "status": -2,
+            "message": "参数不完整"
+        })
+
+    try:
+        lessonId = int(lessonId)
+        # 获取学员信息
+        client = session.query(Client).get(stuId)
+        if not client:
+            return jsonify({
+                "status": -3,
+                "message": "学员不存在"
+            })
+
+        if not client.graduatedLessonIds:
+            client.graduatedLessonIds = []
+        if lessonId not in client.graduatedLessonIds:
+            return jsonify({
+                "status": -4,
+                "message": "该学员尚未毕业，无法取消"
+            })
+        client.graduatedLessonIds.remove(lessonId)
+
+        logContent = f"课程：{session.query(Lesson).get(lessonId).name}取消毕业"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "取消毕业成功"
+        })
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"取消毕业失败：{str(e)}"
         })
 
 
