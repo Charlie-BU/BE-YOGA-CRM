@@ -67,7 +67,7 @@ def checkSessionid(sessionid):
     }
 
 
-def checkUserAuthority(userId, operationLevel="adminOnly"):
+def checkAdminOnly(userId, operationLevel="adminOnly"):
     user = session.query(User).get(userId)
     if not user:
         return False
@@ -78,6 +78,16 @@ def checkUserAuthority(userId, operationLevel="adminOnly"):
         return usertype == 6
     else:
         return True
+
+
+def checkUserAuthority(userId, authorityId):
+    user = session.query(User).get(userId)
+    if not user:
+        return False
+    authority = user.authority
+    if authorityId in authority:
+        return True
+    return False
 
 
 def generateCaptcha():

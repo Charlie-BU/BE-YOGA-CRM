@@ -257,6 +257,11 @@ async def updateClient(request):
             "status": -1,
             "message": "用户未登录"
         })
+    if not checkUserAuthority(userId, 6):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     client_id = data.get("id")
     try:
@@ -350,6 +355,11 @@ async def addClient(request):
             "status": -1,
             "message": "用户未登录"
         })
+    if not checkUserAuthority(userId, 5):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     requiredFields = ['name', 'fromSource', 'weixin']
     # 检查必填字段
@@ -411,7 +421,11 @@ async def deleteClient(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 7):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     client_id = data.get("id")
     if not client_id:
@@ -456,7 +470,11 @@ async def unassignClients(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 9):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     client_ids = data.get("ids")
     client_ids = json.loads(client_ids)
@@ -505,7 +523,11 @@ async def assignClients(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 8):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     client_ids = data.get("ids")
     client_ids = json.loads(client_ids)
@@ -561,7 +583,11 @@ async def convertToClients(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 10):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     ids = data.get("ids")
     ids = json.loads(ids)
@@ -599,7 +625,11 @@ async def submitReserve(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 11):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     clientId = data.get("clientId")
     client = session.query(Client).get(clientId)
@@ -664,7 +694,11 @@ async def cancelReserve(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 12):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     clientId = data.get("clientId")
     client = session.query(Client).get(clientId)
@@ -711,7 +745,11 @@ async def confirmCooperation(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 13):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     clientId = data.get("clientId")
     contractNo = data.get("contractNo")
@@ -763,7 +801,11 @@ async def cancelCooperation(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 14):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     clientId = data.get("clientId")
 
@@ -810,7 +852,11 @@ async def graduateClient(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 15):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     clientId = data.get("id")
 
@@ -861,7 +907,11 @@ async def cancelGraduate(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 15):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     clientId = data.get("id")
 
@@ -912,7 +962,11 @@ async def batchImportClues(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 16):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     clues = data.get("clues")
     clues = json.loads(clues)
@@ -1017,7 +1071,11 @@ async def submitPayment(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 17):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     try:
         amount = int(data.get("amount"))
@@ -1178,7 +1236,11 @@ async def addPayment(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 18):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     amount = float(data.get("amount"))
     if not amount or amount == 0:
@@ -1221,7 +1283,11 @@ async def updatePayment(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 19):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     payment_id = data.get("id")
     if not payment_id:
@@ -1273,7 +1339,11 @@ async def deletePayment(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 20):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     payment_id = data.get("id")
     if not payment_id:

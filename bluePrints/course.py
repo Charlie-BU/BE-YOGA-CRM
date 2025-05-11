@@ -1,9 +1,6 @@
 import json
-import time
 from datetime import date
-
 from robyn import SubRouter, jsonify
-from sqlalchemy import func, text
 
 from models import *
 from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
@@ -88,7 +85,11 @@ async def addCourse(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 21):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     try:
         # 检查必填字段
@@ -149,7 +150,11 @@ async def updateCourse(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 22):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     courseId = data.get("id")
     if not courseId:
@@ -219,7 +224,11 @@ async def deleteCourse(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 23):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     courseId = data.get("id")
     if not courseId:
@@ -311,7 +320,11 @@ async def addCombo(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 24):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     try:
         data = request.json()
         courseIds = data.get('courseIds', [])
@@ -358,7 +371,11 @@ async def updateCombo(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 25):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     try:
         data = request.json()
         combo = session.query(CourseCombo).filter(CourseCombo.id == data.get('id')).first()
@@ -415,7 +432,11 @@ async def deleteCombo(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 26):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     try:
         data = request.json()
         combo = session.query(CourseCombo).filter(CourseCombo.id == data.get('id')).first()
@@ -617,7 +638,6 @@ async def getLessonClients(request):
 
     try:
         lessonId = int(lessonId)
-
         # 使用数据库函数直接过滤，提高性能
         clients_data = []
         clientsCooperated = session.query(Client).filter(
@@ -658,7 +678,11 @@ async def addLesson(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 27):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     try:
         # 检查必填字段
@@ -711,7 +735,11 @@ async def updateLesson(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 28):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     lessonId = data.get("id")
     if not lessonId:
@@ -770,7 +798,11 @@ async def deleteLesson(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 29):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     lessonId = data.get("id")
     if not lessonId:
@@ -899,7 +931,11 @@ async def addStudent(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 30):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     lessonId = data.get("courseId")
     studentId = data.get("studentId")
@@ -969,7 +1005,11 @@ async def removeStudent(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 31):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     stuId = data.get("stuId")
     lessonId = data.get("lessonId")

@@ -3,9 +3,43 @@ import time
 from robyn import SubRouter, jsonify
 
 from models import *
-from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
+from utils.hooks import calcSignature, encode, checkSessionid, checkAdminOnly, checkUserAuthority
 
 userRouter = SubRouter(__file__, prefix="/user")
+
+
+@userRouter.post("/loginCheck")
+async def loginCheck(request):
+    sessionid = request.headers["sessionid"]
+    res = checkSessionid(sessionid)
+    if not res:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    userId, timestamp = res["userId"], res["timestamp"]
+    if time.time() - float(timestamp) > 10800:  # 3小时
+        return jsonify({
+            "status": -2,
+            "message": "登录已过期，请重新登录"
+        })
+    try:
+        user = session.query(User).get(userId)
+        return jsonify({
+            "status": 200,
+            "message": "用户已登录",
+            "data": {
+                "id": user.id,
+                "username": user.username,
+                "usertype": user.usertype,
+            }
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "错误"
+        })
 
 
 @userRouter.post("/login")
@@ -45,40 +79,6 @@ async def login(request):
         })
 
 
-@userRouter.post("/loginCheck")
-async def loginCheck(request):
-    sessionid = request.headers["sessionid"]
-    res = checkSessionid(sessionid)
-    if not res:
-        return jsonify({
-            "status": -1,
-            "message": "用户未登录"
-        })
-    userId, timestamp = res["userId"], res["timestamp"]
-    if time.time() - float(timestamp) > 10800:  # 3小时
-        return jsonify({
-            "status": -2,
-            "message": "登录已过期，请重新登录"
-        })
-    try:
-        user = session.query(User).get(userId)
-        return jsonify({
-            "status": 200,
-            "message": "用户已登录",
-            "data": {
-                "id": user.id,
-                "username": user.username,
-                "usertype": user.usertype,
-            }
-        })
-    except Exception as e:
-        session.rollback()
-        return jsonify({
-            "status": 500,
-            "message": "错误"
-        })
-
-
 @userRouter.post("/getUserInfo")
 async def getUserInfo(request):
     sessionid = request.headers["sessionid"]
@@ -102,10 +102,15 @@ async def getUserInfo(request):
 async def register(request):
     sessionid = request.headers["sessionid"]
     userId = checkSessionid(sessionid).get("userId")
-    if not checkUserAuthority(userId, "adminOnly"):
+    if not userId:
         return jsonify({
             "status": -1,
-            "message": "权限不足"
+            "message": "用户未登录"
+        })
+    if not checkUserAuthority(userId, 1):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
         })
     form = request.json()["form"]
     form = json.loads(form)
@@ -118,13 +123,12 @@ async def register(request):
     if departmentId:
         department = session.query(Department).get(departmentId)
         schoolId = department.schoolId
-    vocation = form["vocation"]
+    vocationId = form["vocationId"]
     status = form["status"]
-    usertype = form["usertype"]
     password = form["password"]
     user = User(username=username, gender=gender, phone=phone, address=address, departmentId=departmentId,
                 schoolId=schoolId,
-                vocation=vocation, status=status, usertype=usertype, hashedPassword=User.hashPassword(password))
+                vocationId=vocationId, status=status, usertype=1, hashedPassword=User.hashPassword(password))
     log = Log(operatorId=userId, operation=f"添加用户：{username}")
     try:
         session.add(user)
@@ -226,19 +230,15 @@ async def updateUser(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(operatorId, 2):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     user_id = data.get("id")
 
     try:
-        # 获取操作者信息，检查权限
-        operator = session.query(User).get(operatorId)
-        if not operator or operator.usertype <= 1:
-            return jsonify({
-                "status": -2,
-                "message": "无权限进行此操作"
-            })
-
         # 查找要更新的用户
         user = session.query(User).get(user_id)
         if not user:
@@ -288,19 +288,15 @@ async def deleteUser(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(operatorId, 3):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     user_id = data.get("id")
 
     try:
-        # 获取操作者信息，检查权限
-        operator = session.query(User).get(operatorId)
-        if not operator or operator.usertype <= 1:
-            return jsonify({
-                "status": -2,
-                "message": "无权限进行此操作"
-            })
-
         # 查找要删除的用户
         user = session.query(User).filter(User.id == user_id).first()
         if not user:
@@ -353,15 +349,11 @@ async def initUserPwd(request):
             "status": -1,
             "message": "用户未登录"
         })
-
-    # 检查当前用户权限
-    curr_user_info = session.query(User).get(curr_user)
-    if not curr_user_info or curr_user_info.usertype <= 1:
+    if not checkUserAuthority(curr_user, 4):
         return jsonify({
-            "status": 403,
-            "message": "无权限执行此操作"
+            "status": -2,
+            "message": "无权限进行该操作"
         })
-
     data = request.json()
     user_id = data.get("id")
 
@@ -1085,4 +1077,75 @@ async def getStuffPerformanceByClient(request):
         return jsonify({
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
+        })
+
+
+@userRouter.post("/getAllVocations")
+async def getAllVocations(request):
+    sessionid = request.headers["sessionid"]
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    vocations = session.query(Role).all()
+    vocations = [vocation.to_json() for vocation in vocations]
+    return jsonify({
+        "status": 200,
+        "message": "全部职位获取成功",
+        "vocations": vocations,
+    })
+
+
+@userRouter.post("/getAllAuthorities")
+async def getAllAuthorities(request):
+    sessionid = request.headers["sessionid"]
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    authorities = session.query(Authority).all()
+    authorities = [authority.to_json() for authority in authorities]
+    return jsonify({
+        "status": 200,
+        "message": "全部权限获取成功",
+        "authorities": authorities,
+    })
+
+
+# 修改职位权限：限定admin
+@userRouter.post("/updateVocationAuthority")
+async def updateVocationAuthority(request):
+    sessionid = request.headers["sessionid"]
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    if not checkAdminOnly(userId, operationLevel="adminOnly"):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
+    data = request.json()
+    vocationId = data["vocationId"]
+    authorities = data["authorities"]
+    try:
+        authorities = json.loads(authorities)
+        vocation = session.query(Role).get(vocationId)
+        vocation.authority = authorities
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "职位权限修改成功",
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "messgae": "职位权限修改失败",
         })

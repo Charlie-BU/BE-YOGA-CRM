@@ -10,10 +10,10 @@ deptRouter = SubRouter(__file__, prefix="/dept")
 async def getAllDepts(request):
     sessionid = request.headers["sessionid"]
     userId = checkSessionid(sessionid).get("userId")
-    if not checkUserAuthority(userId, "adminOnly"):
+    if not userId:
         return jsonify({
             "status": -1,
-            "message": "权限不足"
+            "message": "用户未登录"
         })
     depts = session.query(Department).all()
     depts = [Department.to_json(dept) for dept in depts]
@@ -53,10 +53,10 @@ async def getDeptUsers(request):
 async def getAllSchools(request):
     sessionid = request.headers["sessionid"]
     userId = checkSessionid(sessionid).get("userId")
-    if not checkUserAuthority(userId, "adminOnly"):
+    if not userId:
         return jsonify({
             "status": -1,
-            "message": "权限不足"
+            "message": "用户未登录"
         })
     schools = session.query(School).all()
     schools = [School.to_json(school) for school in schools]
@@ -126,7 +126,11 @@ async def addDept(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 32):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     name = data.get("name")
     info = data.get("info", "")
@@ -185,7 +189,11 @@ async def updateDept(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 33):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     dept_id = data.get("id")
     name = data.get("name")
@@ -253,7 +261,11 @@ async def deleteDept(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 34):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     dept_id = data.get("id")
 
@@ -305,7 +317,11 @@ async def addSchool(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 35):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     name = data.get("name")
     address = data.get("address")
@@ -356,7 +372,11 @@ async def updateSchool(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 36):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     schoolId = data.get("id")
     name = data.get("name")
@@ -416,7 +436,11 @@ async def deleteSchool(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 37):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     schoolId = data.get("id")
 

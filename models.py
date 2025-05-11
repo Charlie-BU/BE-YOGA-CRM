@@ -41,8 +41,19 @@ class User(Base):
     # 所在学校
     schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
     school = relationship("School", backref="users")
-    # 职位：1总经理 / 2店长 / 3总监 / 4校长 / 5咨询 / 6老师 / 7助理 / 8员工 / 9新媒体
-    vocation = Column(Integer, nullable=True)
+    # 职位
+    vocationId = Column(Integer, ForeignKey("role.id"), nullable=True)
+    vocation = relationship("Role", backref="users")
+    @property
+    def vocationName(self):
+        if self.vocationId:
+            return self.vocation.name
+        return ""
+    @property
+    def authority(self):
+        if self.vocationId:
+            return self.vocation.authority
+        return []
     # 人员状态：1在职 / 2离职
     status = Column(Integer, nullable=True)
 
@@ -66,13 +77,46 @@ class User(Base):
             "avatarUrl": self.avatarUrl,
             "departmentId": self.departmentId,
             "schoolId": self.schoolId,
-            "vocation": self.vocation,
+            "vocationId": self.vocationId,
+            "vocationName": self.vocationName,
+            "authority": self.authority,
             "status": self.status,
         }
         if self.departmentId:
             data["departmentName"] = self.department.name
         if self.schoolId:
             data["schoolName"] = self.school.name
+        return data
+
+
+# 职位
+class Role(Base):
+    __tablename__ = "role"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=True)
+    authority = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "authority": self.authority,
+        }
+        return data
+
+
+# 权限
+# 注意⚠️：此表内容通常不允许修改
+class Authority(Base):
+    __tablename__ = "authority"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "name": self.name,
+        }
         return data
 
 

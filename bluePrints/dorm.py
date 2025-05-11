@@ -110,7 +110,11 @@ async def addDormitory(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 38):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     name = data.get("name")
     category = data.get("category")
@@ -148,7 +152,11 @@ async def updateDormitory(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 39):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     dormitory_id = data.get("id")
     name = data.get("name")
@@ -190,7 +198,11 @@ async def deleteDormitory(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 40):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     dormitory_id = data.get("id")
 
@@ -259,7 +271,11 @@ async def addRoom(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 41):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     dormitoryId = data.get("dormitoryId")
     roomNumber = data.get("roomNumber")
@@ -299,7 +315,11 @@ async def updateRoom(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 42):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     room_id = data.get("id")
     roomNumber = data.get("roomNumber")
@@ -341,7 +361,11 @@ async def deleteRoom(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 43):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     room_id = data.get("id")
 
@@ -403,7 +427,11 @@ async def addBed(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 44):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     roomId = data.get("roomId")
     bedNumber = data.get("bedNumber")
@@ -454,7 +482,11 @@ async def updateBed(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 45):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     bed_id = data.get("id")
     bedNumber = data.get("bedNumber")
@@ -496,7 +528,11 @@ async def deleteBed(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 46):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     bed_id = data.get("id")
 
@@ -584,7 +620,11 @@ async def assignBed(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 47):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     bed_id = data.get("bedId")
     student_id = data.get("studentId")
@@ -635,7 +675,11 @@ async def checkOut(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 48):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     bed_id = data.get("bedId")
 
