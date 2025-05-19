@@ -242,8 +242,8 @@ class Client(Base):
     appointDate = Column(Date, nullable=True)
     # 下次沟通日期
     nextTalkDate = Column(Date, nullable=True)
-    # 合同编号
-    contractNo = Column(Text, nullable=True)
+    # 合同url
+    contractUrl = Column(Text, nullable=True)
     # 成单时间
     cooperateTime = Column(DateTime, nullable=True)
     # 已学总课时：周
@@ -289,7 +289,7 @@ class Client(Base):
             "appointDate": self.appointDate,
             "nextTalkDate": self.nextTalkDate,
             "cooperateTime": self.cooperateTime,
-            "contractNo": self.contractNo,
+            "contractUrl": self.contractUrl,
             "learnedWeeks": self.learnedWeeks,
             "bedId": self.bedId,
             "bedCheckInDate": self.bedCheckInDate,

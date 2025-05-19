@@ -1,7 +1,7 @@
-robyn~=0.64.2
-SQLAlchemy
+robyn~=0.65.0
+SQLAlchemy~=2.0.40
 pymysql
-alembic
+alembic~=1.15.2
 bcrypt~=3.2.0
 yagmail~=0.15.293
 requests~=2.32.3
@@ -10,3 +10,4 @@ pandas~=2.2.3
 aiohttp~=3.11.10
 ibm-db
 ibm-db-sa
+python-dateutil~=2.9.0.post0

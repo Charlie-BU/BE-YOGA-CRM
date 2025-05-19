@@ -58,8 +58,13 @@ async def getAllSchools(request):
             "status": -1,
             "message": "用户未登录"
         })
+    data = request.json()
     schools = session.query(School).all()
-    schools = [School.to_json(school) for school in schools]
+    withNet = data.get("withNet", False)
+    if withNet:
+        schools = [School.to_json(school) for school in schools]
+    else:
+        schools = [School.to_json(school) for school in schools if school.name != "网络部"]
     return jsonify({
         "status": 200,
         "message": "全部校区获取成功",

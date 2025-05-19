@@ -1,12 +1,19 @@
 import datetime
-import json
-import time
+import os
 
+import oss2
+from dateutil import parser
+import json
 from robyn import SubRouter, jsonify
 from sqlalchemy import or_
 
+from config import OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_BUCKET_NAME, OSS_ENDPOINT
 from models import *
 from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
+
+# 初始化阿里云OSS Bucket
+auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
+bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
 
 extraRouter = SubRouter(__file__, prefix="/extra")
 
@@ -695,7 +702,7 @@ async def submitReserve(request):
     appointDate = data.get("appointDate")
     if appointDate:
         # 日期格式处理
-        appointDate = datetime.strptime(appointDate, '%m/%d/%Y')
+        appointDate = parser.parse(appointDate)
 
     useCombo = json.loads(data.get("useCombo"))
     if useCombo:
@@ -705,7 +712,7 @@ async def submitReserve(request):
     courseIds = json.loads(courseIds)
     nextTalkDate = data.get("nextTalkDate")
     if nextTalkDate:
-        nextTalkDate = datetime.strptime(nextTalkDate, '%m/%d/%Y')
+        nextTalkDate = parser.parse(nextTalkDate)
     info = data.get("info")
     try:
         # 允许重复预约
@@ -786,113 +793,6 @@ async def cancelReserve(request):
         return jsonify({
             "status": 500,
             "message": f"取消预约失败：{str(e)}"
-        })
-
-
-# 确认成单 / 签署合同
-@extraRouter.post("/confirmCooperation")
-async def confirmCooperation(request):
-    sessionid = request.headers.get("sessionid")
-    userId = checkSessionid(sessionid).get("userId")
-    if not userId:
-        return jsonify({
-            "status": -1,
-            "message": "用户未登录"
-        })
-    if not checkUserAuthority(userId, 13):
-        return jsonify({
-            "status": -2,
-            "message": "无权限进行该操作"
-        })
-    data = request.json()
-    clientId = data.get("clientId")
-    contractNo = data.get("contractNo")
-
-    try:
-        client = session.query(Client).get(clientId)
-        if not client:
-            return jsonify({
-                "status": 400,
-                "message": "客户不存在"
-            })
-
-        # 更新客户状态为已成单
-        if client.processStatus == 2:
-            return jsonify({
-                "status": -2,
-                "message": "客户已成单"
-            })
-        client.processStatus = 2
-        client.contractNo = contractNo
-        client.cooperateTime = datetime.now()
-
-        # 记录操作日志
-        log = Log(operatorId=userId, operation=f"客户：{client.name}确认成单，合同编号：{contractNo}")
-        session.add(log)
-        logContent = f"确认成单，合同编号：{contractNo}"
-        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
-        session.add(clientLog)
-        session.commit()
-
-        return jsonify({
-            "status": 200,
-            "message": "签约成功"
-        })
-    except Exception as e:
-        session.rollback()
-        return jsonify({
-            "status": 500,
-            "message": f"签约失败：{str(e)}"
-        })
-
-
-@extraRouter.post("/cancelCooperation")
-async def cancelCooperation(request):
-    sessionid = request.headers.get("sessionid")
-    userId = checkSessionid(sessionid).get("userId")
-    if not userId:
-        return jsonify({
-            "status": -1,
-            "message": "用户未登录"
-        })
-    if not checkUserAuthority(userId, 14):
-        return jsonify({
-            "status": -2,
-            "message": "无权限进行该操作"
-        })
-    data = request.json()
-    clientId = data.get("clientId")
-
-    try:
-        client = session.query(Client).get(clientId)
-        if not client:
-            return jsonify({
-                "status": 400,
-                "message": "客户不存在"
-            })
-
-        # 更新客户状态为未成单
-        client.processStatus = 1
-        client.contractNo = None
-        client.cooperateTime = None
-
-        # 记录操作日志
-        log = Log(operatorId=userId, operation=f"客户：{client.name}取消成单")
-        session.add(log)
-        logContent = "取消成单"
-        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
-        session.add(clientLog)
-        session.commit()
-
-        return jsonify({
-            "status": 200,
-            "message": "取消成单成功"
-        })
-    except Exception as e:
-        session.rollback()
-        return jsonify({
-            "status": 500,
-            "message": f"取消成单失败：{str(e)}"
         })
 
 
@@ -1509,3 +1409,192 @@ async def getClientLogs(request):
             "status": 500,
             "message": "日志获取失败"
         })
+
+
+# 确认成单
+@extraRouter.post("/confirmCooperation")
+async def confirmCooperation(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    if not checkUserAuthority(userId, 13):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
+    data = request.json()
+    clientId = data.get("clientId")
+
+    try:
+        client = session.query(Client).get(clientId)
+        if not client:
+            return jsonify({
+                "status": 400,
+                "message": "客户不存在"
+            })
+
+        # 更新客户状态为已成单
+        if client.processStatus == 2:
+            return jsonify({
+                "status": -2,
+                "message": "客户已成单"
+            })
+        client.processStatus = 2
+        client.cooperateTime = datetime.now()
+
+        # 记录操作日志
+        log = Log(operatorId=userId, operation=f"客户：{client.name}确认成单")
+        session.add(log)
+        logContent = f"确认成单"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "成单成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"成单失败：{str(e)}"
+        })
+
+
+
+@extraRouter.post("/cancelCooperation")
+async def cancelCooperation(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    if not checkUserAuthority(userId, 14):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
+    data = request.json()
+    clientId = data.get("clientId")
+
+    try:
+        client = session.query(Client).get(clientId)
+        if not client:
+            return jsonify({
+                "status": 400,
+                "message": "客户不存在"
+            })
+        # 阿里云OSS对应文件删除
+        if client.contractUrl:
+            try:
+                prefix = f'https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/'
+                bucket.delete_object(client.contractUrl[len(prefix):])
+            except Exception as e:
+                pass
+        # 更新客户状态为未成单
+        client.processStatus = 1
+        client.contractUrl = None
+        client.cooperateTime = None
+
+        # 记录操作日志
+        log = Log(operatorId=userId, operation=f"客户：{client.name}取消成单")
+        session.add(log)
+        logContent = "取消成单"
+        clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        session.add(clientLog)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "取消成单成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"取消成单失败：{str(e)}"
+        })
+
+
+# 上传合同
+@extraRouter.post("/uploadContract")
+async def uploadContract(request):
+    # 验证用户登录和权限
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    if not checkUserAuthority(userId, 13):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
+    try:
+        # 获取上传的文件和客户ID
+        # 字典{ 文件1名: 文件1 }
+        files: dict = request.files
+        fileName, fileData = next(iter(files.items()))
+        clientId = request.form_data.get('clientId')
+
+        if not files:
+            return jsonify({
+                "status": 400,
+                "message": "未上传文件"
+            })
+        if not clientId:
+            return jsonify({
+                "status": 400,
+                "message": "未提供客户ID"
+            })
+
+        # 获取客户信息
+        client = session.query(Client).get(clientId)
+        if not client:
+            return jsonify({
+                "status": 400,
+                "message": "客户不存在"
+            })
+
+        # 暂存文件
+        # file_path = os.path.join("./temp", fileName)
+        # with open(file_path, "wb") as f:
+        #     f.write(fileData)
+
+        # 上传到阿里云OSS
+        oss_path = f'contracts/{fileName}'
+        bucket.put_object(oss_path, fileData)
+        # 获取文件URL
+        file_url = f'https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/{oss_path}'
+        # 更新客户合同信息
+        client.contractUrl = file_url
+
+        # # 记录操作日志
+        # log = Log(operatorId=userId, operation=f"客户：{client.name}上传合同文件：{filename}")
+        # session.add(log)
+        # logContent = f"上传合同文件：{filename}"
+        # clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        # session.add(clientLog)
+        session.commit()
+        return jsonify({
+            "status": 200,
+            "message": "合同上传成功",
+        })
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"合同上传失败：{str(e)}"
+        })
+
+
