@@ -1,6 +1,3 @@
-import json
-from math import isnan
-
 from robyn import Robyn, ALLOW_CORS
 
 from bluePrints.course import courseRouter
@@ -29,6 +26,74 @@ async def index():
 
 # @app.get("/importClues")
 # async def importClues():
+#     import pandas as pd
+#     from dateutil import parser
+#
+#     df = pd.read_excel('clues.xlsx')
+#
+#     field_mapping = {
+#         'name': 'name',
+#         'gender': 'gender',
+#         'age': 'age',
+#         'phone': 'phone',
+#         'weixin': 'weixin',
+#         'IDNumber': 'IDNumber',
+#         'QQ': 'QQ',
+#         'douyin': 'douyin',
+#         'rednote': 'rednote',
+#         'shangwutong': 'shangwutong',
+#         'address': 'address',
+#         'fromSource': 'fromSource',
+#         'clientStatus': 'clientStatus',
+#         'createdTime': 'createdTime',
+#         'processStatus': 'processStatus',
+#         'info': 'info',
+#         "affiliatedUserId": "affiliatedUserId",
+#     }
+#
+#     clients_to_insert = []
+#     success_count = 0
+#     error_count = 0
+#
+#     for _, row in df.iterrows():
+#         try:
+#             client_data = {}
+#             for excel_field, db_field in field_mapping.items():
+#                 value = row.get(excel_field)
+#                 if pd.isna(value):
+#                     client_data[db_field] = None
+#                     continue
+#
+#                 if excel_field == "gender":
+#                     client_data[db_field] = 1 if value == "男" else 2
+#                 elif excel_field == "info":
+#                     client_data[db_field] = [str(value)]
+#                 elif excel_field == "processStatus" and not value:
+#                     client_data[db_field] = 1
+#                 elif excel_field == "createdTime":
+#                     client_data[db_field] = parser.parse(value)
+#                 else:
+#                     client_data[db_field] = value
+#
+#             client = Client(**client_data)
+#             clients_to_insert.append(client)
+#             success_count += 1
+#
+#         except Exception as e:
+#             print(f"导入失败：{e}")
+#             error_count += 1
+#
+#     try:
+#         session.bulk_save_objects(clients_to_insert)
+#         session.commit()
+#         return f"导入完成：成功 {success_count} 条，失败 {error_count} 条"
+#     except Exception as e:
+#         session.rollback()
+#         return f"导入失败：{str(e)}"
+
+
+# @app.get("/importCluesSlow")
+# async def importCluesSlow():
 #     import pandas as pd
 #     from datetime import datetime
 #
