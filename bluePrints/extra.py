@@ -318,7 +318,7 @@ async def updateClient(request):
             "address": "地区"
         }
         for key, value in data.items():
-            if value == "null" or not value:
+            if value == "null":
                 continue
             if hasattr(client, key):
                 try:
