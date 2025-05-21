@@ -3,7 +3,7 @@ import time
 from robyn import SubRouter, jsonify
 
 from models import *
-from utils.hooks import calcSignature, encode, checkSessionid, checkAdminOnly, checkUserAuthority
+from utils.hooks import calcSignature, encode, checkSessionid, checkAdminOnly, checkUserAuthority, clearLogs
 
 userRouter = SubRouter(__file__, prefix="/user")
 
@@ -63,8 +63,8 @@ async def login(request):
         rawSessionid = f"userId={user.id}&timestamp={int(time.time())}&signature={signature}&algorithm=sha256"
         sessionid = encode(rawSessionid)
         log = Log(operatorId=user.id, operation="用户登录")
-
         session.add(log)
+        clearLogs()
         session.commit()
         return jsonify({
             "status": 200,

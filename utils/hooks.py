@@ -7,8 +7,8 @@ import time
 import yagmail
 import random
 
-from config import LOGIN_SECRET
-from models import session, User
+from config import LOGIN_SECRET, MAX_LOG_LENGTH
+from models import session, User, Log
 
 
 # from models import *
@@ -98,3 +98,17 @@ def generateCaptcha():
     captcha = random.sample(source, 6)
     captcha = "".join(captcha)
     return captcha
+
+
+def clearLogs():
+    log_count = session.query(Log).count()
+    if log_count > MAX_LOG_LENGTH:
+        delete_count = log_count - MAX_LOG_LENGTH
+        subquery = (
+            session.query(Log.id)
+            .order_by(Log.time.asc())
+            .limit(delete_count)
+            .subquery()
+        )
+        session.query(Log).filter(Log.id.in_(subquery)).delete(synchronize_session=False)
+        # session.commit()
