@@ -111,11 +111,13 @@ class Authority(Base):
     __tablename__ = "authority"
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, nullable=True)
+    module = Column(Text, nullable=True)
 
     def to_json(self):
         data = {
             "id": self.id,
             "name": self.name,
+            "module": self.module,
         }
         return data
 
@@ -274,7 +276,6 @@ class Client(Base):
             "creatorId": self.creatorId,
             "creatorName": self.creatorName,
             "createdTime": self.createdTime,
-            "info": self.info,
             "toClientTime": self.toClientTime,
             "appointerId": self.appointerId,
             "appointerName": self.appointerName,
@@ -294,6 +295,8 @@ class Client(Base):
             "bedId": self.bedId,
             "bedCheckInDate": self.bedCheckInDate,
         }
+        if self.info:
+            data["info"] = [info for info in self.info if info != ""]
         if self.affiliatedUserId:
             data["affiliatedUserName"] = self.affiliatedUser.username
         if self.comboId:

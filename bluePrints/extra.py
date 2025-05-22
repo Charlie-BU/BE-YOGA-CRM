@@ -453,6 +453,7 @@ async def addClient(request):
 
         # 添加创建人和创建时间信息
         data['creatorId'] = userId
+        data['info'] = [data.get("info")] if data.get('info') else []
         # 创建新客户
         new_client = Client(**data)
         session.add(new_client)
@@ -495,6 +496,10 @@ async def deleteClient(request):
             "message": "缺少客户ID"
         })
     try:
+        his_logs = session.query(ClientLog).filter(ClientLog.clientId == client_id).all()
+        for log in his_logs:
+            session.delete(log)
+        session.commit()
         client = session.query(Client).filter(Client.id == client_id).first()
         if not client:
             return jsonify({
@@ -507,14 +512,13 @@ async def deleteClient(request):
         log = Log(operatorId=userId,
                   operation=logContent)
         session.add(log)
-        clientLog = ClientLog(clientId=client_id, operatorId=userId, operation=logContent)
-        session.add(clientLog)
         session.commit()
         return jsonify({
             "status": 200,
             "message": "删除成功"
         })
     except Exception as e:
+        print(e)
         session.rollback()
         return jsonify({
             "status": 500,
@@ -960,13 +964,14 @@ async def batchImportClues(request):
                     "rednote": clue.get("小红书", ""),
                     "shangwutong": clue.get("商务通", ""),
                     "address": clue.get("地区", ""),
-                    "info": clue.get("备注", ""),
+                    "info": [clue.get("备注", "")],
                     "clientStatus": 1,  # 线索状态
                     "creatorId": userId
                 }
 
                 # 验证必填字段
                 if not new_clue["name"] or not new_clue["weixin"]:
+                    error_msg = "未添线索姓名或微信"
                     error_count += 1
                     continue
 
@@ -992,6 +997,7 @@ async def batchImportClues(request):
                 success_count += 1
 
             except Exception as e:
+                print(e)
                 error_count += 1
                 continue
 
@@ -1466,7 +1472,6 @@ async def confirmCooperation(request):
         })
 
 
-
 @extraRouter.post("/cancelCooperation")
 async def cancelCooperation(request):
     sessionid = request.headers.get("sessionid")
@@ -1523,7 +1528,7 @@ async def cancelCooperation(request):
         })
 
 
-# 上传合同
+# 上传合同TODO
 @extraRouter.post("/uploadContract")
 async def uploadContract(request):
     # 验证用户登录和权限
@@ -1539,62 +1544,66 @@ async def uploadContract(request):
             "status": -2,
             "message": "无权限进行该操作"
         })
-    try:
-        # 获取上传的文件和客户ID
-        # 字典{ 文件1名: 文件1 }
-        files: dict = request.files
-        fileName, fileData = next(iter(files.items()))
-        clientId = request.form_data.get('clientId')
-
-        if not files:
-            return jsonify({
-                "status": 400,
-                "message": "未上传文件"
-            })
-        if not clientId:
-            return jsonify({
-                "status": 400,
-                "message": "未提供客户ID"
-            })
-
-        # 获取客户信息
-        client = session.query(Client).get(clientId)
-        if not client:
-            return jsonify({
-                "status": 400,
-                "message": "客户不存在"
-            })
-
-        # 暂存文件
-        # file_path = os.path.join("./temp", fileName)
-        # with open(file_path, "wb") as f:
-        #     f.write(fileData)
-
-        # 上传到阿里云OSS
-        oss_path = f'contracts/{fileName}'
-        bucket.put_object(oss_path, fileData)
-        # 获取文件URL
-        file_url = f'https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/{oss_path}'
-        # 更新客户合同信息
-        client.contractUrl = file_url
-
-        # # 记录操作日志
-        # log = Log(operatorId=userId, operation=f"客户：{client.name}上传合同文件：{filename}")
-        # session.add(log)
-        # logContent = f"上传合同文件：{filename}"
-        # clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
-        # session.add(clientLog)
-        session.commit()
+    # try:
+    # 获取上传的文件和客户ID
+    # 字典{ 文件1名: 文件1 }
+    files: dict = request.files
+    if not files:
         return jsonify({
-            "status": 200,
-            "message": "合同上传成功",
+            "status": 400,
+            "message": "未上传文件"
+        })
+    fileName, fileData = next(iter(files.items()))
+    clientId = request.form_data.get('clientId')
+
+    if not files:
+        return jsonify({
+            "status": 400,
+            "message": "未上传文件"
+        })
+    if not clientId:
+        return jsonify({
+            "status": 400,
+            "message": "未提供客户ID"
         })
 
-    except Exception as e:
-        session.rollback()
+    # 获取客户信息
+    client = session.query(Client).get(clientId)
+    if not client:
         return jsonify({
-            "status": 500,
-            "message": f"合同上传失败：{str(e)}"
+            "status": 400,
+            "message": "客户不存在"
         })
 
+    # 暂存文件
+    # file_path = os.path.join("./temp", fileName)
+    # with open(file_path, "wb") as f:
+    #     f.write(fileData)
 
+    # 上传到阿里云OSS
+    oss_path = f'contracts/{fileName}'
+    bucket.put_object(oss_path, fileData)
+    # 获取文件URL
+    file_url = f'https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/{oss_path}'
+    # 更新客户合同信息
+    client.contractUrl = file_url
+
+    # # 记录操作日志
+    # log = Log(operatorId=userId, operation=f"客户：{client.name}上传合同文件：{filename}")
+    # session.add(log)
+    # logContent = f"上传合同文件：{filename}"
+    # clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+    # session.add(clientLog)
+    session.commit()
+    return jsonify({
+        "status": 200,
+        "message": "合同上传成功",
+    })
+
+    # except Exception as e:
+    #     print(e)
+    #     session.rollback()
+    #     return jsonify({
+    #         "status": 500,
+    #         "message": f"合同上传失败：{str(e)}"
+    #     })

@@ -410,14 +410,14 @@ async def getCustomerServiceSummaryData(request):
             # 已转客户的（加）- 修改日期比较逻辑
             convertedToClients = [
                 hisClient for hisClient in hisClients
-                if hisClient.clientStatus >= 3
+                if hisClient.clientStatus >= 3 and hisClient.toClientTime
                    and (startDate <= hisClient.toClientTime.strftime(
                     '%Y-%m-%d') <= endDate if startDate and endDate else True)
             ]
             # 已成单的（报）- 修改日期比较逻辑
             dealedClients = [
                 hisClient for hisClient in hisClients
-                if hisClient.processStatus == 2
+                if hisClient.processStatus == 2 and hisClient.cooperateTime
                    and (startDate <= hisClient.cooperateTime.strftime(
                     '%Y-%m-%d') <= endDate if startDate and endDate else True)
             ]
@@ -491,6 +491,8 @@ async def getCustomerServiceSummaryData(request):
             "allData": allData
         })
     except Exception as e:
+        print(e)
+        session.rollback()
         return jsonify({
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
@@ -1107,7 +1109,7 @@ async def getAllAuthorities(request):
             "status": -1,
             "message": "用户未登录"
         })
-    authorities = session.query(Authority).all()
+    authorities = session.query(Authority).order_by(Authority.module).all()
     authorities = [authority.to_json() for authority in authorities]
     return jsonify({
         "status": 200,
