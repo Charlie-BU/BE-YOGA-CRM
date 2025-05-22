@@ -1151,3 +1151,36 @@ async def updateVocationAuthority(request):
             "status": 500,
             "messgae": "职位权限修改失败",
         })
+
+
+@userRouter.post("/addVocation")
+async def addVocation(request):
+    sessionid = request.headers.get("sessionid")
+    curr_user = checkSessionid(sessionid).get("userId")
+    if not curr_user:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+    if not checkUserAuthority(curr_user, 49):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
+    data = request.json()
+    name = data.get("name")
+    try:
+        vocation = Role(name=name)
+        session.add(vocation)
+        session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "职位添加成功"
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": f"密码初始化失败：{str(e)}"
+        })

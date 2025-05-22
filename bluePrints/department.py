@@ -15,7 +15,12 @@ async def getAllDepts(request):
             "status": -1,
             "message": "用户未登录"
         })
-    depts = session.query(Department).all()
+    data = request.json()
+    schoolId = data.get("schoolId")
+    if schoolId:
+        depts = session.query(Department).filter(Department.schoolId == schoolId).all()
+    else:
+        depts = session.query(Department).all()
     depts = [Department.to_json(dept) for dept in depts]
     return jsonify({
         "status": 200,

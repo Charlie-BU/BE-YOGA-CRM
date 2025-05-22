@@ -21,7 +21,7 @@ app.include_router(dormRouter)
 
 @app.get("/")
 async def index():
-    return "Welcome to YOGA CRM with Db2"
+    return "Welcome to YOGA CRM"
 
 
 # @app.get("/importClues")
