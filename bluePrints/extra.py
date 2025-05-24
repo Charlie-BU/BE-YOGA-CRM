@@ -37,6 +37,45 @@ async def getClientById(request):
     })
 
 
+@extraRouter.post("/searchClient")
+async def searchClient(request):
+    sessionid = request.headers.get("sessionid")
+    userId = checkSessionid(sessionid).get("userId")
+    if not userId:
+        return jsonify({
+            "status": -1,
+            "message": "用户未登录"
+        })
+
+    data = request.json()
+    page_index = data.get("pageIndex", 1)
+    page_size = data.get("pageSize", 10)
+    offset = (int(page_index) - 1) * int(page_size)
+    contact = data.get("contact")
+    if not contact:
+        return jsonify({
+            "status": -1,
+            "message": "请输入联系方式"
+        })
+    # 构建查询
+    query = session.query(Client).order_by(Client.createdTime.desc(), Client.clientStatus)
+    query = query.filter(or_(Client.weixin.contains(contact), Client.phone.contains(contact), Client.QQ.contains(contact), Client.douyin.contains(contact), Client.shangwutong.contains(contact)))
+
+    # 获取分页数据
+    clients = query.offset(offset).limit(page_size).all()
+    clients = [Client.to_json(client) for client in clients]
+
+    # 获取总数
+    total = query.count()
+
+    return jsonify({
+        "status": 200,
+        "message": "分页获取成功",
+        "clients": clients,
+        "total": total
+    })
+
+
 # 获取线索公海（不包括已转客户、已预约到店）
 @extraRouter.post("/getClueClients")
 async def getClueClients(request):
