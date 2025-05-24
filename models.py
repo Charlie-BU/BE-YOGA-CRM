@@ -432,14 +432,14 @@ class Lesson(Base):
 
     # 主讲人
     chiefTeacherId = Column(Integer, nullable=True)
-
-    @property
-    def chiefTeacherName(self):
-        chiefTeacher = session.query(User).get(self.chiefTeacherId)
-        if chiefTeacher:
-            return chiefTeacher.username
-        else:
-            return ""
+    chiefTeacherName = Column(Text, nullable=True)
+    # @property
+    # def chiefTeacherName(self):
+    #     chiefTeacher = session.query(User).get(self.chiefTeacherId)
+    #     if chiefTeacher:
+    #         return chiefTeacher.username
+    #     else:
+    #         return ""
 
     # 班主任
     classTeacherId = Column(Integer, nullable=True)

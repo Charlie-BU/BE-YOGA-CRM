@@ -197,6 +197,7 @@ async def getAllUsers(request):
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
     schoolId = data.get("schoolId")
+    deptId = data.get("deptId")
     try:
         # 获取分页数据
         query = session.query(User)
@@ -204,6 +205,8 @@ async def getAllUsers(request):
             query = query.filter(User.username.like(f"%{name}%")).order_by(User.schoolId)
         if schoolId:
             query = query.filter(User.schoolId == schoolId).order_by(User.schoolId)
+        if deptId:
+            query = query.filter(User.departmentId == deptId).order_by(User.schoolId)
         users = query.offset(offset).limit(page_size).all()
         users = [User.to_json(user) for user in users]
         # 获取总数

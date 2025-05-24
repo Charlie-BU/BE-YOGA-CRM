@@ -559,9 +559,10 @@ async def getLessons(request):
         if category:
             query = query.join(Lesson.course).filter(Course.category == category)
         if chiefTeacherName:
-            chiefTeacher = session.query(User).filter(User.username.like(f"%{chiefTeacherName}%")).first()
-            if chiefTeacher:
-                query = query.filter(Lesson.chiefTeacherId == chiefTeacher.id)
+            query = query.filter(Lesson.chiefTeacherName.like(f"%{chiefTeacherName}%"))
+            # chiefTeacher = session.query(User).filter(User.username.like(f"%{chiefTeacherName}%")).first()
+            # if chiefTeacher:
+            #     query = query.filter(Lesson.chiefTeacherId == chiefTeacher.id)
         if classTeacherName:
             classTeacher = session.query(User).filter(User.username.like(f"%{classTeacherName}%")).first()
             if classTeacher:
@@ -737,7 +738,7 @@ async def addLesson(request):
     data = request.json()
     try:
         # 检查必填字段
-        required_fields = ['name', 'courseId', 'schoolId', 'chiefTeacherId', 'startDate']  # 添加开课日期为必填
+        required_fields = ['name', 'courseId', 'schoolId', 'chiefTeacherName', 'startDate']  # 添加开课日期为必填
         for field in required_fields:
             if not data.get(field):
                 return jsonify({
@@ -749,7 +750,7 @@ async def addLesson(request):
         new_lesson = Lesson(
             name=data['name'],
             courseId=data['courseId'],
-            chiefTeacherId=data['chiefTeacherId'],
+            chiefTeacherName=data['chiefTeacherName'],
             classTeacherId=data.get('classTeacherId') if data.get('classTeacherId') else None,
             teachingAssistantName=data.get('teachingAssistantName'),
             startDate=data['startDate'],  # 添加开课日期
@@ -810,7 +811,7 @@ async def updateLesson(request):
 
         # 更新班级信息
         update_fields = [
-            'name', 'courseId', 'schoolId', 'chiefTeacherId',
+            'name', 'courseId', 'schoolId', 'chiefTeacherName',
             'classTeacherId', 'teachingAssistantName', 'info',
             'startDate', 'endDate'  # 添加开课和结课日期字段
         ]
