@@ -93,6 +93,18 @@ def checkUserAuthority(userId, authorityId):
     return False
 
 
+def checkUserVisibleClient(userId):
+    user = session.query(User).get(userId)
+    if not user or not user.clientVisible:
+        return [0, None, None]
+    res = [user.clientVisible, user.schoolId, user.departmentId]
+    # admin豁免
+    if user.usertype >= 2:
+        res[0] = 4
+        return res
+    return res
+
+
 def generateCaptcha():
     source = string.digits * 6
     captcha = random.sample(source, 6)

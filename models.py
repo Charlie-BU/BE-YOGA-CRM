@@ -44,18 +44,23 @@ class User(Base):
     # 职位
     vocationId = Column(Integer, ForeignKey("role.id"), nullable=True)
     vocation = relationship("Role", backref="users")
+
     @property
     def vocationName(self):
         if self.vocationId:
             return self.vocation.name
         return ""
+
     @property
     def authority(self):
         if self.vocationId:
             return self.vocation.authority
         return []
+
     # 人员状态：1在职 / 2离职
     status = Column(Integer, nullable=True)
+    # 可见线索状态：1本人相关 / 2本校区 / 3本部门 / 4全部
+    clientVisible = Column(Integer, nullable=True, default=1)
 
     @staticmethod  # 静态方法归属于类的命名空间，同时能够在不依赖类的实例的情况下调用
     def hashPassword(password):
@@ -81,6 +86,7 @@ class User(Base):
             "vocationName": self.vocationName,
             "authority": self.authority,
             "status": self.status,
+            "clientVisible": self.clientVisible,
         }
         if self.departmentId:
             data["departmentName"] = self.department.name
@@ -208,6 +214,9 @@ class Client(Base):
         appointer = session.query(User).get(self.appointerId)
         if appointer and appointer.schoolId:
             return appointer.schoolId
+        creator = session.query(User).get(self.creatorId)
+        if creator and creator.schoolId:
+            return creator.schoolId
         return None
 
     @property
@@ -217,6 +226,9 @@ class Client(Base):
         appointer = session.query(User).get(self.appointerId)
         if appointer and appointer.schoolId:
             return appointer.school.name
+        creator = session.query(User).get(self.creatorId)
+        if creator and creator.schoolId:
+            return creator.school.name
         return ""
 
     # 课程（多个）

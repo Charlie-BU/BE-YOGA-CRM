@@ -128,7 +128,8 @@ async def register(request):
     password = form["password"]
     user = User(username=username, gender=gender, phone=phone, address=address, departmentId=departmentId,
                 schoolId=schoolId,
-                vocationId=vocationId, status=status, usertype=1, hashedPassword=User.hashPassword(password))
+                vocationId=vocationId, status=status, usertype=1, clientVisible=1,
+                hashedPassword=User.hashPassword(password))
     log = Log(operatorId=userId, operation=f"添加用户：{username}")
     try:
         session.add(user)

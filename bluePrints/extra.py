@@ -9,7 +9,7 @@ from sqlalchemy import or_
 
 from config import OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_BUCKET_NAME, OSS_ENDPOINT
 from models import *
-from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
+from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority, checkUserVisibleClient
 
 # 初始化阿里云OSS Bucket
 auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
@@ -59,7 +59,9 @@ async def searchClient(request):
         })
     # 构建查询
     query = session.query(Client).order_by(Client.createdTime.desc(), Client.clientStatus)
-    query = query.filter(or_(Client.weixin.contains(contact), Client.phone.contains(contact), Client.QQ.contains(contact), Client.douyin.contains(contact), Client.shangwutong.contains(contact)))
+    query = query.filter(
+        or_(Client.weixin.contains(contact), Client.phone.contains(contact), Client.QQ.contains(contact),
+            Client.douyin.contains(contact), Client.shangwutong.contains(contact)))
 
     # 获取分页数据
     clients = query.offset(offset).limit(page_size).all()
@@ -140,6 +142,29 @@ async def getClueClients(request):
         if affiliatedUserId:
             query = query.filter(Client.affiliatedUserId.in_(affiliatedUserId))
 
+    # 权限分割
+    tag, schoolId, deptId = checkUserVisibleClient(userId)
+    match tag:
+        case 1:  # 本人相关
+            query = query.filter(
+                or_(Client.affiliatedUserId == userId, Client.creatorId == userId, Client.appointerId == userId))
+        case 2:  # 本校区
+            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
+            query = query.filter(
+                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                    Client.appointerId.in_(teacher_ids)))
+        case 3:  # 本部门
+            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
+            query = query.filter(
+                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                    Client.appointerId.in_(teacher_ids)))
+        case 4:  # 全部
+            pass
+        case _:
+            return jsonify({
+                "status": -2,
+                "message": "未限定范围"
+            })
     # 获取分页数据
     clients = query.offset(offset).limit(page_size).all()
     clients = [Client.to_json(client) for client in clients]
@@ -220,6 +245,29 @@ async def getClients(request):
     if clientStatus:
         query = query.filter(Client.clientStatus == clientStatus)
 
+        # 权限分割
+    tag, schoolId, deptId = checkUserVisibleClient(userId)
+    match tag:
+        case 1:  # 本人相关
+            query = query.filter(
+                or_(Client.affiliatedUserId == userId, Client.creatorId == userId, Client.appointerId == userId))
+        case 2:  # 本校区
+            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
+            query = query.filter(
+                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                    Client.appointerId.in_(teacher_ids)))
+        case 3:  # 本部门
+            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
+            query = query.filter(
+                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                    Client.appointerId.in_(teacher_ids)))
+        case 4:  # 全部
+            pass
+        case _:
+            return jsonify({
+                "status": -2,
+                "message": "未限定范围"
+            })
     # 获取分页数据
     clients = query.offset(offset).limit(page_size).all()
     clients = [Client.to_json(client) for client in clients]
@@ -255,6 +303,30 @@ async def getDealedClients(request):
                                                                              Client.createdTime.desc())
     if name:
         query = query.filter(Client.name.like(f"%{name}%"))
+
+        # 权限分割
+    tag, schoolId, deptId = checkUserVisibleClient(userId)
+    match tag:
+        case 1:  # 本人相关
+            query = query.filter(
+                or_(Client.affiliatedUserId == userId, Client.creatorId == userId, Client.appointerId == userId))
+        case 2:  # 本校区
+            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
+            query = query.filter(
+                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                    Client.appointerId.in_(teacher_ids)))
+        case 3:  # 本部门
+            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
+            query = query.filter(
+                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                    Client.appointerId.in_(teacher_ids)))
+        case 4:  # 全部
+            pass
+        case _:
+            return jsonify({
+                "status": -2,
+                "message": "未限定范围"
+            })
     clients = query.offset(offset).limit(page_size).all()
     clients = [Client.to_json(client) for client in clients]
     # 获取总数
@@ -1567,7 +1639,7 @@ async def cancelCooperation(request):
         })
 
 
-# 上传合同TODO
+# 上传合同
 @extraRouter.post("/uploadContract")
 async def uploadContract(request):
     # 验证用户登录和权限
