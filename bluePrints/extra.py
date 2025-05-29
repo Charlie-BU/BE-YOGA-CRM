@@ -46,7 +46,11 @@ async def searchClient(request):
             "status": -1,
             "message": "用户未登录"
         })
-
+    if not checkUserAuthority(userId, 50):
+        return jsonify({
+            "status": -2,
+            "message": "无权限进行该操作"
+        })
     data = request.json()
     page_index = data.get("pageIndex", 1)
     page_size = data.get("pageSize", 10)

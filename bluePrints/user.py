@@ -32,6 +32,7 @@ async def loginCheck(request):
                 "id": user.id,
                 "username": user.username,
                 "usertype": user.usertype,
+                "authority": user.authority,
             }
         })
     except Exception as e:
@@ -58,6 +59,11 @@ async def login(request):
             return jsonify({
                 "status": -2,
                 "message": "密码错误"
+            })
+        if user.status != 1:
+            return jsonify({
+                "status": -3,
+                "message": "您处于离职状态，暂无法登录"
             })
         signature = calcSignature(user.id)
         rawSessionid = f"userId={user.id}&timestamp={int(time.time())}&signature={signature}&algorithm=sha256"
