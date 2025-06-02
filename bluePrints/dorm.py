@@ -1,7 +1,6 @@
-import json
-import time
 from datetime import timedelta
 
+from dateutil import parser
 from robyn import SubRouter, jsonify
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload
@@ -439,7 +438,6 @@ async def addBed(request):
     roomId = data.get("roomId")
     bedNumber = data.get("bedNumber")
     category = data.get("category")
-    duration = data.get("duration")
 
     try:
         room = session.query(Room).get(roomId)
@@ -457,8 +455,7 @@ async def addBed(request):
         new_bed = Bed(
             roomId=roomId,
             bedNumber=bedNumber,
-            category=category,
-            duration=duration
+            category=category
         )
         session.add(new_bed)
         session.commit()
@@ -494,7 +491,6 @@ async def updateBed(request):
     bed_id = data.get("id")
     bedNumber = data.get("bedNumber")
     category = data.get("category")
-    duration = data.get("duration")
 
     try:
         bed = session.query(Bed).filter(Bed.id == bed_id).first()
@@ -507,7 +503,6 @@ async def updateBed(request):
         # 更新床位信息
         bed.bedNumber = bedNumber
         bed.category = category
-        bed.duration = duration
         session.commit()
 
         return jsonify({
@@ -597,7 +592,11 @@ async def getUncheckedDealedClients(request):
         if name:
             query = query.filter(Client.name.like(f"%{name}%"))
         clients = query.offset(offset).limit(page_size).all()
-        clients = [Client.to_json(client) for client in clients]
+        clients = [{
+            "id": client.id,
+            "name": client.name,
+            "phone": client.phone,
+        } for client in clients]
         # 获取总数
         total = query.count()
         return jsonify({
@@ -631,6 +630,8 @@ async def assignBed(request):
     data = request.json()
     bed_id = data.get("bedId")
     student_id = data.get("studentId")
+    checkOutDate = data.get("checkOutDate")
+    daysDuration = (parser.parse(checkOutDate).date() - datetime.now().date()).days
 
     try:
         bed = session.query(Bed).filter(Bed.id == bed_id).first()
@@ -650,6 +651,8 @@ async def assignBed(request):
         # 分配床位
         student.bedId = bed_id
         student.bedCheckInDate = datetime.now().date()
+        student.bedCheckOutDate = checkOutDate
+        bed.duration = daysDuration
         log = Log(operatorId=userId, operation=f"学员：{student.name}入住")
         session.add(log)
         logContent = "学员入住宿舍"
@@ -709,6 +712,8 @@ async def checkOut(request):
         # 清除学员的床位信息
         student.bedId = None
         student.bedCheckInDate = None
+        student.bedCheckOutDate = None
+        bed.duration = 0
 
         # 添加操作日志
         log = Log(operatorId=userId, operation=f"学员：{student_name}离住")
@@ -729,7 +734,6 @@ async def checkOut(request):
         })
 
 
-# 获取已超期的床位和学员
 @dormRouter.post("/getOverdueBeds")
 async def getOverdueBeds(request):
     sessionid = request.headers.get("sessionid")
@@ -749,12 +753,17 @@ async def getOverdueBeds(request):
             if not bed.clients:
                 continue  # 安全检查
             client = bed.clients[-1]  # 默认取最后入住者
-            check_in_date = client.bedCheckInDate
-            duration_weeks = bed.duration or 0
-            expected_checkout = check_in_date + timedelta(weeks=duration_weeks)
 
-            if today > expected_checkout:
-                overdue_days = (today - expected_checkout).days
+            # 使用离住日期判断是否超期
+            check_out_date = client.bedCheckOutDate
+
+            # 如果没有设置离住日期，则跳过
+            if not check_out_date:
+                continue
+
+            # 如果离住日期在今天之前，则已超期
+            if today > check_out_date:
+                overdue_days = (today - check_out_date).days
                 result.append({
                     "bedId": bed.id,
                     "clientId": client.id,
@@ -762,7 +771,8 @@ async def getOverdueBeds(request):
                     "dormName": bed.room.dormitory.name,
                     "roomNumber": bed.room.roomNumber,
                     "bedNumber": bed.bedNumber,
-                    "bedCheckInDate": check_in_date,
+                    "bedCheckInDate": client.bedCheckInDate,
+                    "bedCheckOutDate": check_out_date,
                     "overdueDays": overdue_days
                 })
         return jsonify({

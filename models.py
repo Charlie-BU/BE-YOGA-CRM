@@ -269,6 +269,8 @@ class Client(Base):
     bed = relationship("Bed", backref="clients")
     # 入住时间
     bedCheckInDate = Column(Date, nullable=True)
+    # 离住时间
+    bedCheckOutDate = Column(Date, nullable=True)
 
     def to_json(self):
         data = {
@@ -308,6 +310,7 @@ class Client(Base):
             "learnedWeeks": self.learnedWeeks,
             "bedId": self.bedId,
             "bedCheckInDate": self.bedCheckInDate,
+            "bedCheckOutDate": self.bedCheckOutDate,
         }
         if self.info:
             data["info"] = [info for info in self.info if info != ""]
@@ -643,7 +646,7 @@ class Bed(Base):
     bedNumber = Column(Integer, nullable=True)
     # 类型：1单人床 / 2上铺 / 3下铺
     category = Column(Integer, nullable=True)
-    # 时间期限：周
+    # 时间期限：天
     duration = Column(Integer, nullable=True)
 
     @property
@@ -667,6 +670,7 @@ class Bed(Base):
             data["studentId"] = self.clients[-1].id
             data["studentName"] = self.clients[-1].name
             data["bedCheckInDate"] = self.clients[-1].bedCheckInDate
+            data["bedCheckOutDate"] = self.clients[-1].bedCheckOutDate
         return data
 
 

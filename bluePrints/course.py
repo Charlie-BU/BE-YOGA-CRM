@@ -1,9 +1,10 @@
 import json
 from datetime import date
 from robyn import SubRouter, jsonify
+from sqlalchemy import or_
 
 from models import *
-from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
+from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority, checkUserVisibleClient
 
 courseRouter = SubRouter(__file__, prefix="/course")
 
@@ -914,10 +915,33 @@ async def getQualifiedStudents(request):
             "message": "参数不完整"
         })
     lessonCourseId = int(lessonCourseId)
+    query = session.query(Client).filter(Client.processStatus == 2,
+                                         Client.courseIds.contains(lessonCourseId))
+    # 权限分割
+    tag, schoolId, deptId = checkUserVisibleClient(userId)
+    match tag:
+        case 1:  # 本人相关
+            query = query.filter(
+                or_(Client.affiliatedUserId == userId, Client.creatorId == userId, Client.appointerId == userId))
+        case 2:  # 本校区
+            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
+            query = query.filter(
+                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                    Client.appointerId.in_(teacher_ids)))
+        case 3:  # 本部门
+            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
+            query = query.filter(
+                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                    Client.appointerId.in_(teacher_ids)))
+        case 4:  # 全部
+            pass
+        case _:
+            return jsonify({
+                "status": -2,
+                "message": "未限定范围"
+            })
     # 获取分页数据
-    clients = session.query(Client).filter(Client.processStatus == 2,
-                                           Client.courseIds.contains(lessonCourseId)).order_by(Client.clientStatus,
-                                                                                               Client.createdTime.desc()).all()
+    clients = query.order_by(Client.clientStatus, Client.createdTime.desc()).all()
 
     clients = [Client.to_json(client) for client in clients]
     return jsonify({
@@ -1035,6 +1059,21 @@ async def removeStudent(request):
                 "status": -3,
                 "message": "学员不存在"
             })
+        # 店长可以移除本校区数据，其他人只能移除自己所属的数据
+        user = session.query(User).get(userId)
+        if user.usertype == 1:
+            if user.vocationId == 2:
+                if client.schoolId != user.schoolId:
+                    return jsonify({
+                        "status": -5,
+                        "message": "您只能移除您所在校区的学员"
+                    })
+            else:
+                if client.creatorId != userId and client.affiliatedUserId != userId and client.appointerId != userId:
+                    return jsonify({
+                        "status": -6,
+                        "message": "您只能移除所属于您的学员"
+                    })
 
         # 从学员的课程列表中移除该课程
         if client.lessonIds and lessonId in client.lessonIds:
