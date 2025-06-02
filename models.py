@@ -196,7 +196,7 @@ class Client(Base):
     # 转客户时间
     toClientTime = Column(DateTime, nullable=True)
 
-    # 预约人
+    # 接待人
     appointerId = Column(Integer, nullable=True)
 
     @property
@@ -351,8 +351,8 @@ class Course(Base):
     schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
     school = relationship("School", backref="courses")
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
-    # 课时：周
-    duration = Column(Float, nullable=True)
+    # 课时
+    duration = Column(Text, nullable=True)
     price = Column(Float, nullable=True)
     info = Column(Text, nullable=True)
 

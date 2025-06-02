@@ -18,6 +18,7 @@ bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
 extraRouter = SubRouter(__file__, prefix="/extra")
 
 
+# 只有客户信息卡调用该接口
 @extraRouter.post("/getClientById")
 async def getClientById(request):
     sessionid = request.headers.get("sessionid")
@@ -30,6 +31,32 @@ async def getClientById(request):
     data = request.json()
     clientId = data.get("clientId")
     client = session.query(Client).get(clientId)
+    # 权限处理
+    ok = False
+    user = session.query(User).get(userId)
+    # admin豁免
+    if user.usertype >= 2:
+        ok = True
+    # 班主任
+    his_lesson_ids = client.lessonIds
+    his_lessons = session.query(Lesson).filter(Lesson.id.in_(his_lesson_ids)).all()
+    his_classTeacher_ids = [his_lesson.classTeacherId for his_lesson in his_lessons]
+    if userId in his_classTeacher_ids:
+        ok = True
+    # 当前校区的店长
+    his_schoolId = client.schoolId
+    if int(user.schoolId) == int(his_schoolId) and user.vocationId == 2:
+        ok = True
+    # ta的所属人
+    if client.creatorId == userId or client.affiliatedUserId == userId or client.appointerId == userId:
+        ok = True
+
+    if not ok:
+        return jsonify({
+            "status": -2,
+            "message": "您没有权限查看该客户信息卡",
+        })
+
     return jsonify({
         "status": 200,
         "message": "客户信息获取成功",
@@ -249,7 +276,7 @@ async def getClients(request):
     if clientStatus:
         query = query.filter(Client.clientStatus == clientStatus)
 
-        # 权限分割
+    # 权限分割
     tag, schoolId, deptId = checkUserVisibleClient(userId)
     match tag:
         case 1:  # 本人相关
@@ -1284,6 +1311,27 @@ async def getPayments(request):
 
         if data.get("endTime"):
             query = query.filter(Payment.paymentDate <= data["endTime"])
+
+        # 权限分割
+        tag, schoolId, deptId = checkUserVisibleClient(userId)
+        match tag:
+            case 1:  # 本人相关
+                my_relevant_client_ids = [tid for (tid,) in session.query(Client.id).filter(
+                    or_(Client.creatorId == userId, Client.appointerId == userId, Client.affiliatedUserId == userId))]
+                query = query.filter(Payment.clientId.in_(my_relevant_client_ids))
+            case 2:  # 本校区
+                teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
+                query = query.filter(Payment.teacherId.in_(teacher_ids))
+            case 3:  # 本部门
+                teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
+                query = query.filter(Payment.teacherId.in_(teacher_ids))
+            case 4:  # 全部
+                pass
+            case _:
+                return jsonify({
+                    "status": -2,
+                    "message": "未限定范围"
+                })
 
         total = query.count()
         payments = query.order_by(Payment.paymentDate.desc(), Payment.id.desc()).offset(

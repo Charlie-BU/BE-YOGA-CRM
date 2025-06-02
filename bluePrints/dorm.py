@@ -79,9 +79,12 @@ async def getDormitories(request):
         else:
             query = session.query(Dormitory)
 
+        # 权限分割
+        user = session.query(User).get(userId)
+        if user.usertype == 1:
+            query = session.query(Dormitory).filter(Dormitory.schoolId == user.schoolId)
         # 获取总数
         total = query.count()
-
         # 获取分页数据
         dormitories = query.order_by(Dormitory.id) \
             .offset((int(pageIndex) - 1) * int(pageSize)) \
