@@ -209,8 +209,9 @@ class Client(Base):
     # 所在校区
     @property
     def schoolId(self):
-        if self.affiliatedUser:
-            return self.affiliatedUser.schoolId
+        affiliatedUser = session.query(User).get(self.affiliatedUserId)
+        if affiliatedUser:
+            return affiliatedUser.schoolId
         appointer = session.query(User).get(self.appointerId)
         if appointer and appointer.schoolId:
             return appointer.schoolId
@@ -224,8 +225,9 @@ class Client(Base):
         appointer = session.query(User).get(self.appointerId)
         if appointer and appointer.schoolId:
             return appointer.school.name
-        if self.affiliatedUser:
-            return self.affiliatedUser.school.name
+        affiliatedUser = session.query(User).get(self.affiliatedUserId)
+        if affiliatedUser:
+            return affiliatedUser.school.name
         creator = session.query(User).get(self.creatorId)
         if creator and creator.schoolId:
             return creator.school.name
@@ -572,6 +574,9 @@ class Dormitory(Base):
     category = Column(Integer, nullable=True)
     schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
     school = relationship("School", backref="dormitories")
+    @property
+    def roomCount(self):
+        return session.query(Room).filter(Room.dormitoryId==self.id).count()
 
     def to_json(self):
         data = {
@@ -579,12 +584,10 @@ class Dormitory(Base):
             "name": self.name,
             "category": self.category,
             "schoolId": self.schoolId,
-            "roomCount": 0
+            "roomCount": self.roomCount,
         }
         if self.schoolId:
             data["schoolName"] = self.school.name
-        if self.rooms:
-            data["roomCount"] = len(self.rooms)
         return data
 
 
@@ -611,8 +614,9 @@ class Room(Base):
     # sum(True, True, False) => 2，因为 True 就是 1，False 是 0。
     @property
     def occupiedBeds(self):
-        if self.beds:
-            return sum(bool(bed.clients) for bed in self.beds)
+        beds = session.query(Bed).filter(Bed.roomId==self.id).all()
+        if len(beds) != 0:
+            return sum(bool(bed.clients) for bed in beds)
         return 0
 
     def to_json(self):
