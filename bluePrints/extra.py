@@ -1612,15 +1612,15 @@ async def cancelCooperation(request):
                 "message": "客户不存在"
             })
         # 阿里云OSS对应文件删除
-        if client.contractUrl:
-            try:
-                prefix = f'https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/'
-                bucket.delete_object(client.contractUrl[len(prefix):])
-            except Exception as e:
-                pass
+        # if client.contractUrl:
+        #     try:
+        #         prefix = f'https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/'
+        #         bucket.delete_object(client.contractUrl[len(prefix):])
+        #     except Exception as e:
+        #         pass
         # 更新客户状态为未成单
         client.processStatus = 1
-        client.contractUrl = None
+        # client.contractUrl = None
         client.cooperateTime = None
 
         # 记录操作日志

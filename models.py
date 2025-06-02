@@ -221,11 +221,11 @@ class Client(Base):
 
     @property
     def schoolName(self):
-        if self.affiliatedUser:
-            return self.affiliatedUser.school.name
         appointer = session.query(User).get(self.appointerId)
         if appointer and appointer.schoolId:
             return appointer.school.name
+        if self.affiliatedUser:
+            return self.affiliatedUser.school.name
         creator = session.query(User).get(self.creatorId)
         if creator and creator.schoolId:
             return creator.school.name
