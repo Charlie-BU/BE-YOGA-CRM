@@ -5,7 +5,6 @@ from bluePrints.department import deptRouter
 from bluePrints.dorm import dormRouter
 from bluePrints.extra import extraRouter
 from bluePrints.user import userRouter
-from models import User, session, Client
 
 app = Robyn(__file__)
 # 生产环境需要注释：使用nginx解决跨域

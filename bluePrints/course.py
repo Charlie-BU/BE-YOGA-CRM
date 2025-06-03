@@ -11,6 +11,7 @@ courseRouter = SubRouter(__file__, prefix="/course")
 
 @courseRouter.post("/getCourses")
 async def getCourses(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -48,10 +49,13 @@ async def getCourses(request):
             "status": 500,
             "message": f"获取课程列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/getCoursesByIds")
 async def getCoursesByIds(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -75,10 +79,13 @@ async def getCoursesByIds(request):
             "status": 500,
             "message": f"获取课程信息失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/addCourse")
 async def addCourse(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -140,10 +147,13 @@ async def addCourse(request):
             "status": 500,
             "message": f"添加失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/updateCourse")
 async def updateCourse(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -217,10 +227,13 @@ async def updateCourse(request):
             "status": 500,
             "message": f"更新失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/deleteCourse")
 async def deleteCourse(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -271,10 +284,13 @@ async def deleteCourse(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/getAllCombos")
 async def getAllCombos(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -313,10 +329,13 @@ async def getAllCombos(request):
             "status": 500,
             "message": f"获取套餐列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/addCombo")
 async def addCombo(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -364,10 +383,13 @@ async def addCombo(request):
             "status": 500,
             "message": f"添加套餐失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/updateCombo")
 async def updateCombo(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -425,10 +447,13 @@ async def updateCombo(request):
             "status": 500,
             "message": f"更新套餐失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/deleteCombo")
 async def deleteCombo(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -471,10 +496,13 @@ async def deleteCombo(request):
             "status": 500,
             "message": f"删除套餐失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/getCourseClients")
 async def getCourseClients(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -523,10 +551,13 @@ async def getCourseClients(request):
             "status": 500,
             "message": f"查询失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/getLessons")
 async def getLessons(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -594,10 +625,13 @@ async def getLessons(request):
             "status": 500,
             "message": f"获取班级列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/getLessonsByIds")
 async def getLessonsByIds(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -621,10 +655,13 @@ async def getLessonsByIds(request):
             "status": 500,
             "message": f"获取班级信息失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/getLessonClients")
 async def getLessonClients(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -672,10 +709,13 @@ async def getLessonClients(request):
             "status": 500,
             "message": f"查询失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/getLessonGraduatedClients")
 async def getLessonGraduatedClients(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -723,10 +763,13 @@ async def getLessonGraduatedClients(request):
             "status": 500,
             "message": f"查询失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/addLesson")
 async def addLesson(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -780,10 +823,13 @@ async def addLesson(request):
             "status": 500,
             "message": f"添加失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/updateLesson")
 async def updateLesson(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -843,10 +889,13 @@ async def updateLesson(request):
             "status": 500,
             "message": f"更新失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @courseRouter.post("/deleteLesson")
 async def deleteLesson(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -897,11 +946,14 @@ async def deleteLesson(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 获取可加入班级的学员
 @courseRouter.post("/getQualifiedStudents")
 async def getQualifiedStudents(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -947,6 +999,7 @@ async def getQualifiedStudents(request):
     clients = query.order_by(Client.clientStatus, Client.createdTime.desc()).all()
 
     clients = [Client.to_json(client) for client in clients]
+    session.close()
     return jsonify({
         "status": 200,
         "message": "可加入班级学员获取成功",
@@ -957,6 +1010,7 @@ async def getQualifiedStudents(request):
 # 班级添加学员
 @courseRouter.post("/addStudent")
 async def addStudent(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -1026,11 +1080,14 @@ async def addStudent(request):
             "status": 500,
             "message": f"添加失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 班级移除学员
 @courseRouter.post("/removeStudent")
 async def removeStudent(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -1101,11 +1158,14 @@ async def removeStudent(request):
             "status": 500,
             "message": f"移除失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 班级学员毕业
 @courseRouter.post("/graduateClient")
 async def graduateClient(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -1162,11 +1222,14 @@ async def graduateClient(request):
             "status": 500,
             "message": f"毕业失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 班级学员取消毕业
 @courseRouter.post("/ungraduateClient")
 async def ungraduateClient(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -1223,11 +1286,14 @@ async def ungraduateClient(request):
             "status": 500,
             "message": f"取消毕业失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 获取学生课程信息
 @courseRouter.post("/getStudentCourses")
 async def getStudentCourses(request):
+    session = Session()
     sessionid = request.headers.get("sessionid")
     userId = checkSessionid(sessionid).get("userId")
     if not userId:
@@ -1282,3 +1348,5 @@ async def getStudentCourses(request):
             "status": 500,
             "message": "学生课程信息获取失败"
         })
+    finally:
+        session.close()

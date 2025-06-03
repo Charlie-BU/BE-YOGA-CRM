@@ -19,7 +19,9 @@ naming_convention = {
 Base.metadata.naming_convention = naming_convention
 # 会话，用于通过ORM操作数据库
 Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-session = Session()
+
+
+# session = Session()
 
 
 class User(Base):
@@ -184,9 +186,11 @@ class Client(Base):
 
     @property
     def creatorName(self):
+        session = Session()
         creator = session.query(User).get(self.creatorId)
         if not creator:
             return ""
+        session.close()
         return creator.username
 
     createdTime = Column(DateTime, nullable=True, default=datetime.now)
@@ -201,37 +205,47 @@ class Client(Base):
 
     @property
     def appointerName(self):
+        session = Session()
         appointer = session.query(User).get(self.appointerId)
         if not appointer:
             return ""
+        session.close()
         return appointer.username
 
     # 所在校区
     @property
     def schoolId(self):
-        affiliatedUser = session.query(User).get(self.affiliatedUserId)
-        if affiliatedUser:
-            return affiliatedUser.schoolId
-        appointer = session.query(User).get(self.appointerId)
-        if appointer and appointer.schoolId:
-            return appointer.schoolId
-        creator = session.query(User).get(self.creatorId)
-        if creator and creator.schoolId:
-            return creator.schoolId
-        return None
+        session = Session()
+        try:
+            affiliatedUser = session.query(User).get(self.affiliatedUserId)
+            if affiliatedUser:
+                return affiliatedUser.schoolId
+            appointer = session.query(User).get(self.appointerId)
+            if appointer and appointer.schoolId:
+                return appointer.schoolId
+            creator = session.query(User).get(self.creatorId)
+            if creator and creator.schoolId:
+                return creator.schoolId
+            return None
+        finally:
+            session.close()
 
     @property
     def schoolName(self):
-        appointer = session.query(User).get(self.appointerId)
-        if appointer and appointer.schoolId:
-            return appointer.school.name
-        affiliatedUser = session.query(User).get(self.affiliatedUserId)
-        if affiliatedUser:
-            return affiliatedUser.school.name
-        creator = session.query(User).get(self.creatorId)
-        if creator and creator.schoolId:
-            return creator.school.name
-        return ""
+        session = Session()
+        try:
+            appointer = session.query(User).get(self.appointerId)
+            if appointer and appointer.schoolId:
+                return appointer.school.name
+            affiliatedUser = session.query(User).get(self.affiliatedUserId)
+            if affiliatedUser:
+                return affiliatedUser.school.name
+            creator = session.query(User).get(self.creatorId)
+            if creator and creator.schoolId:
+                return creator.school.name
+            return ""
+        finally:
+            session.close()
 
     # 课程（多个）
     courseIds = Column(MutableList.as_mutable(JSON()), nullable=True, default=[])
@@ -240,12 +254,14 @@ class Client(Base):
 
     @property
     def courseNames(self):
+        session = Session()
         if not self.courseIds or len(self.courseIds) == 0:
             return ""
         courses = [session.query(Course).get(id) for id in self.courseIds]
         if courses:
             courseNames = [course.name for course in courses if course is not None]
             return "，".join(courseNames)
+        session.close()
         return ""
 
     # 班级
@@ -317,10 +333,12 @@ class Client(Base):
         if self.affiliatedUserId:
             data["affiliatedUserName"] = self.affiliatedUser.username
         if self.comboId:
+            session = Session()
             combo = session.query(CourseCombo).get(self.comboId)
             if combo:
                 data["comboName"] = combo.showName
                 data["comboPrice"] = combo.price
+            session.close()
         # 数据过大了
         # if self.bedId:
         #     data["bed"] = self.bed.to_json()
@@ -412,8 +430,10 @@ class CourseCombo(Base):
             data["schoolName"] = self.school.name
         # 课程名列表
         if self.courseIds and len(self.courseIds) > 0:
+            session = Session()
             courses = [session.query(Course).get(courseId) for courseId in self.courseIds]
             data["courseNames"] = [course.name for course in courses]
+            session.close()
         return data
 
 
@@ -463,7 +483,9 @@ class Lesson(Base):
 
     @property
     def classTeacherName(self):
+        session = Session()
         classTeacher = session.query(User).get(self.classTeacherId)
+        session.close()
         if classTeacher:
             return classTeacher.username
         else:
@@ -494,8 +516,10 @@ class Lesson(Base):
             "createdTime": self.createdTime,
         }
         if self.schoolId:
+            session = Session()
             school = session.query(School).get(self.schoolId)
             data["schoolName"] = school.name
+            session.close()
         return data
 
 
@@ -577,9 +601,13 @@ class Dormitory(Base):
     category = Column(Integer, nullable=True)
     schoolId = Column(Integer, ForeignKey("school.id"), nullable=True)
     school = relationship("School", backref="dormitories")
+
     @property
     def roomCount(self):
-        return session.query(Room).filter(Room.dormitoryId==self.id).count()
+        session = Session()
+        roomCount = session.query(Room).filter(Room.dormitoryId == self.id).count()
+        session.close()
+        return roomCount
 
     def to_json(self):
         data = {
@@ -617,7 +645,9 @@ class Room(Base):
     # sum(True, True, False) => 2，因为 True 就是 1，False 是 0。
     @property
     def occupiedBeds(self):
-        beds = session.query(Bed).filter(Bed.roomId==self.id).all()
+        session = Session()
+        beds = session.query(Bed).filter(Bed.roomId == self.id).all()
+        session.close()
         if len(beds) != 0:
             return sum(bool(bed.clients) for bed in beds)
         return 0

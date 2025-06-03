@@ -4,6 +4,7 @@ import os
 import oss2
 from dateutil import parser
 import json
+
 from robyn import SubRouter, jsonify
 from sqlalchemy import or_
 
@@ -30,38 +31,47 @@ async def getClientById(request):
         })
     data = request.json()
     clientId = data.get("clientId")
-    client = session.query(Client).get(clientId)
-    # 权限处理
-    ok = False
-    user = session.query(User).get(userId)
-    # admin豁免
-    if user.usertype >= 2:
-        ok = True
-    # 班主任
-    his_lesson_ids = client.lessonIds
-    his_lessons = session.query(Lesson).filter(Lesson.id.in_(his_lesson_ids)).all()
-    his_classTeacher_ids = [his_lesson.classTeacherId for his_lesson in his_lessons]
-    if userId in his_classTeacher_ids:
-        ok = True
-    # 当前校区的店长
-    his_schoolId = client.schoolId
-    if int(user.schoolId) == int(his_schoolId) and user.vocationId == 2:
-        ok = True
-    # ta的所属人
-    if client.creatorId == userId or client.affiliatedUserId == userId or client.appointerId == userId:
-        ok = True
+    session = Session()
+    try:
+        client = session.query(Client).get(clientId)
+        # 权限处理
+        ok = False
+        user = session.query(User).get(userId)
+        # admin豁免
+        if user.usertype >= 2:
+            ok = True
+        # 班主任
+        his_lesson_ids = client.lessonIds
+        his_lessons = session.query(Lesson).filter(Lesson.id.in_(his_lesson_ids)).all()
+        his_classTeacher_ids = [his_lesson.classTeacherId for his_lesson in his_lessons]
+        if userId in his_classTeacher_ids:
+            ok = True
+        # 当前校区的店长
+        his_schoolId = client.schoolId
+        if int(user.schoolId) == int(his_schoolId) and user.vocationId == 2:
+            ok = True
+        # ta的所属人
+        if client.creatorId == userId or client.affiliatedUserId == userId or client.appointerId == userId:
+            ok = True
 
-    if not ok:
+        if not ok:
+            return jsonify({
+                "status": -2,
+                "message": "您没有权限查看该客户信息卡",
+            })
         return jsonify({
-            "status": -2,
-            "message": "您没有权限查看该客户信息卡",
+            "status": 200,
+            "message": "客户信息获取成功",
+            "client": client.to_json(),
         })
-
-    return jsonify({
-        "status": 200,
-        "message": "客户信息获取成功",
-        "client": client.to_json(),
-    })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "失败",
+        })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/searchClient")
@@ -88,25 +98,34 @@ async def searchClient(request):
             "status": -1,
             "message": "请输入联系方式"
         })
-    # 构建查询
-    query = session.query(Client).order_by(Client.createdTime.desc(), Client.clientStatus)
-    query = query.filter(
-        or_(Client.weixin.contains(contact), Client.phone.contains(contact), Client.QQ.contains(contact),
-            Client.douyin.contains(contact), Client.shangwutong.contains(contact)))
+    session = Session()
+    try:
+        # 构建查询
+        query = session.query(Client).order_by(Client.createdTime.desc(), Client.clientStatus)
+        query = query.filter(
+            or_(Client.weixin.contains(contact), Client.phone.contains(contact), Client.QQ.contains(contact),
+                Client.douyin.contains(contact), Client.shangwutong.contains(contact)))
 
-    # 获取分页数据
-    clients = query.offset(offset).limit(page_size).all()
-    clients = [Client.to_json(client) for client in clients]
+        # 获取分页数据
+        clients = query.offset(offset).limit(page_size).all()
+        clients = [Client.to_json(client) for client in clients]
 
-    # 获取总数
-    total = query.count()
+        # 获取总数
+        total = query.count()
 
-    return jsonify({
-        "status": 200,
-        "message": "分页获取成功",
-        "clients": clients,
-        "total": total
-    })
+        return jsonify({
+            "status": 200,
+            "message": "分页获取成功",
+            "clients": clients,
+            "total": total
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500
+        })
+    finally:
+        session.close()
 
 
 # 获取线索公海（不包括已转客户、已预约到店）
@@ -124,7 +143,8 @@ async def getClueClients(request):
     page_index = data.get("pageIndex", 1)
     page_size = data.get("pageSize", 10)
     offset = (int(page_index) - 1) * int(page_size)
-
+    session = Session()
+    # try:
     # 构建查询
     query = session.query(Client).order_by(Client.createdTime.desc(), Client.clientStatus)
 
@@ -209,6 +229,14 @@ async def getClueClients(request):
         "clients": clients,
         "total": total
     })
+    # except Exception as e:
+    #     print(e)
+    #     session.rollback()
+    #     return jsonify({
+    #         "status": 500,
+    #     })
+    # finally:
+    #     session.close()
 
 
 # 获取已转客户、已预约到店
@@ -229,89 +257,97 @@ async def getClients(request):
     page_index = data.get("pageIndex", 1)
     page_size = data.get("pageSize", 10)
     offset = (int(page_index) - 1) * int(page_size)
+    session = Session()
+    try:
+        # 基础查询
+        query = session.query(Client).filter(Client.clientStatus.in_([3, 4])).order_by(Client.clientStatus,
+                                                                                       Client.createdTime.desc())
 
-    # 基础查询
-    query = session.query(Client).filter(Client.clientStatus.in_([3, 4])).order_by(Client.clientStatus,
-                                                                                   Client.createdTime.desc())
+        # 添加筛选条件
+        filters = {
+            'name': lambda x: Client.name.like(f"%{x}%"),
+            'fromSource': lambda x: Client.fromSource == x,
+            'gender': lambda x: Client.gender == x,
+            'age': lambda x: Client.age == x,
+            'IDNumber': lambda x: Client.IDNumber.like(f"%{x}%"),
+            'phone': lambda x: Client.phone.like(f"%{x}%"),
+            'weixin': lambda x: Client.weixin.like(f"%{x}%"),
+            'QQ': lambda x: Client.QQ.like(f"%{x}%"),
+            'douyin': lambda x: Client.douyin.like(f"%{x}%"),
+            'rednote': lambda x: Client.rednote.like(f"%{x}%"),
+            'shangwutong': lambda x: Client.shangwutong.like(f"%{x}%"),
+            'address': lambda x: Client.address.like(f"%{x}%"),
+            'appointerId': lambda x: Client.appointerId == x,
+            'affiliatedUserName': lambda x: Client.affiliatedUser.username.like(f"%{x}%"),
+            # 'appointerName': lambda x: Client.appointerName.like(f"%{x}%"),
+            'processStatus': lambda x: Client.processStatus == x,
+        }
 
-    # 添加筛选条件
-    filters = {
-        'name': lambda x: Client.name.like(f"%{x}%"),
-        'fromSource': lambda x: Client.fromSource == x,
-        'gender': lambda x: Client.gender == x,
-        'age': lambda x: Client.age == x,
-        'IDNumber': lambda x: Client.IDNumber.like(f"%{x}%"),
-        'phone': lambda x: Client.phone.like(f"%{x}%"),
-        'weixin': lambda x: Client.weixin.like(f"%{x}%"),
-        'QQ': lambda x: Client.QQ.like(f"%{x}%"),
-        'douyin': lambda x: Client.douyin.like(f"%{x}%"),
-        'rednote': lambda x: Client.rednote.like(f"%{x}%"),
-        'shangwutong': lambda x: Client.shangwutong.like(f"%{x}%"),
-        'address': lambda x: Client.address.like(f"%{x}%"),
-        'appointerId': lambda x: Client.appointerId == x,
-        'affiliatedUserName': lambda x: Client.affiliatedUser.username.like(f"%{x}%"),
-        # 'appointerName': lambda x: Client.appointerName.like(f"%{x}%"),
-        'processStatus': lambda x: Client.processStatus == x,
-    }
+        # 处理校区：由于schoolId是@property属性，不是SQL字段，直接filter不执行
+        if data.get("schoolId"):
+            query = query.join(Client.affiliatedUser).filter(User.schoolId == data["schoolId"])
 
-    # 处理校区：由于schoolId是@property属性，不是SQL字段，直接filter不执行
-    if data.get("schoolId"):
-        query = query.join(Client.affiliatedUser).filter(User.schoolId == data["schoolId"])
+        # 处理日期范围筛选
+        if data.get('startTime') and data.get('endTime'):
+            query = query.filter(Client.createdTime.between(data['startTime'], data['endTime']))
 
-    # 处理日期范围筛选
-    if data.get('startTime') and data.get('endTime'):
-        query = query.filter(Client.createdTime.between(data['startTime'], data['endTime']))
+        if data.get('appointStartDate') and data.get('appointEndDate'):
+            query = query.filter(Client.appointDate.between(data['appointStartDate'], data['appointEndDate']))
 
-    if data.get('appointStartDate') and data.get('appointEndDate'):
-        query = query.filter(Client.appointDate.between(data['appointStartDate'], data['appointEndDate']))
+        if data.get('nextTalkStartDate') and data.get('nextTalkEndDate'):
+            query = query.filter(Client.nextTalkDate.between(data['nextTalkStartDate'], data['nextTalkEndDate']))
 
-    if data.get('nextTalkStartDate') and data.get('nextTalkEndDate'):
-        query = query.filter(Client.nextTalkDate.between(data['nextTalkStartDate'], data['nextTalkEndDate']))
+        # 应用其他筛选条件
+        for field, filter_func in filters.items():
+            if data.get(field):
+                query = query.filter(filter_func(data[field]))
 
-    # 应用其他筛选条件
-    for field, filter_func in filters.items():
-        if data.get(field):
-            query = query.filter(filter_func(data[field]))
+        if clientStatus:
+            query = query.filter(Client.clientStatus == clientStatus)
 
-    if clientStatus:
-        query = query.filter(Client.clientStatus == clientStatus)
+        # 权限分割
+        tag, schoolId, deptId = checkUserVisibleClient(userId)
+        match tag:
+            case 1:  # 本人相关
+                query = query.filter(
+                    or_(Client.affiliatedUserId == userId, Client.creatorId == userId, Client.appointerId == userId))
+            case 2:  # 本校区
+                teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
+                query = query.filter(
+                    or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                        Client.appointerId.in_(teacher_ids)))
+            case 3:  # 本部门
+                teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
+                query = query.filter(
+                    or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                        Client.appointerId.in_(teacher_ids)))
+            case 4:  # 全部
+                pass
+            case _:
+                return jsonify({
+                    "status": -2,
+                    "message": "未限定范围"
+                })
+        # 获取分页数据
+        clients = query.offset(offset).limit(page_size).all()
+        clients = [Client.to_json(client) for client in clients]
 
-    # 权限分割
-    tag, schoolId, deptId = checkUserVisibleClient(userId)
-    match tag:
-        case 1:  # 本人相关
-            query = query.filter(
-                or_(Client.affiliatedUserId == userId, Client.creatorId == userId, Client.appointerId == userId))
-        case 2:  # 本校区
-            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
-            query = query.filter(
-                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
-                    Client.appointerId.in_(teacher_ids)))
-        case 3:  # 本部门
-            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
-            query = query.filter(
-                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
-                    Client.appointerId.in_(teacher_ids)))
-        case 4:  # 全部
-            pass
-        case _:
-            return jsonify({
-                "status": -2,
-                "message": "未限定范围"
-            })
-    # 获取分页数据
-    clients = query.offset(offset).limit(page_size).all()
-    clients = [Client.to_json(client) for client in clients]
+        # 获取总数
+        total = query.count()
 
-    # 获取总数
-    total = query.count()
-
-    return jsonify({
-        "status": 200,
-        "message": "分页获取成功",
-        "clients": clients,
-        "total": total
-    })
+        return jsonify({
+            "status": 200,
+            "message": "分页获取成功",
+            "clients": clients,
+            "total": total
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+        })
+    finally:
+        session.close()
 
 
 # 获取成单客户
@@ -329,45 +365,54 @@ async def getDealedClients(request):
     page_size = data.get("pageSize", 10)  # 每页数量，默认10条
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
-    # 获取分页数据
-    query = session.query(Client).filter(Client.processStatus == 2).order_by(Client.clientStatus,
-                                                                             Client.createdTime.desc())
-    if name:
-        query = query.filter(Client.name.like(f"%{name}%"))
+    session = Session()
+    try:
+        # 获取分页数据
+        query = session.query(Client).filter(Client.processStatus == 2).order_by(Client.clientStatus,
+                                                                                 Client.createdTime.desc())
+        if name:
+            query = query.filter(Client.name.like(f"%{name}%"))
 
-        # 权限分割
-    tag, schoolId, deptId = checkUserVisibleClient(userId)
-    match tag:
-        case 1:  # 本人相关
-            query = query.filter(
-                or_(Client.affiliatedUserId == userId, Client.creatorId == userId, Client.appointerId == userId))
-        case 2:  # 本校区
-            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
-            query = query.filter(
-                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
-                    Client.appointerId.in_(teacher_ids)))
-        case 3:  # 本部门
-            teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
-            query = query.filter(
-                or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
-                    Client.appointerId.in_(teacher_ids)))
-        case 4:  # 全部
-            pass
-        case _:
-            return jsonify({
-                "status": -2,
-                "message": "未限定范围"
-            })
-    clients = query.offset(offset).limit(page_size).all()
-    clients = [Client.to_json(client) for client in clients]
-    # 获取总数
-    total = query.count()
-    return jsonify({
-        "status": 200,
-        "message": "分页获取成功",
-        "clients": clients,
-        "total": total
-    })
+            # 权限分割
+        tag, schoolId, deptId = checkUserVisibleClient(userId)
+        match tag:
+            case 1:  # 本人相关
+                query = query.filter(
+                    or_(Client.affiliatedUserId == userId, Client.creatorId == userId, Client.appointerId == userId))
+            case 2:  # 本校区
+                teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.schoolId == schoolId)]
+                query = query.filter(
+                    or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                        Client.appointerId.in_(teacher_ids)))
+            case 3:  # 本部门
+                teacher_ids = [tid for (tid,) in session.query(User.id).filter(User.departmentId == deptId)]
+                query = query.filter(
+                    or_(Client.affiliatedUserId.in_(teacher_ids), Client.creatorId.in_(teacher_ids),
+                        Client.appointerId.in_(teacher_ids)))
+            case 4:  # 全部
+                pass
+            case _:
+                return jsonify({
+                    "status": -2,
+                    "message": "未限定范围"
+                })
+        clients = query.offset(offset).limit(page_size).all()
+        clients = [Client.to_json(client) for client in clients]
+        # 获取总数
+        total = query.count()
+        return jsonify({
+            "status": 200,
+            "message": "分页获取成功",
+            "clients": clients,
+            "total": total
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+        })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/getClassStudents")
@@ -381,20 +426,29 @@ async def getClassStudents(request):
         })
     data = request.json()
     stuId = data.get("stuId")
-    student = session.query(Client).get(stuId)
-    stuInfo = {
-        "id": stuId,
-        "name": student.name,
-        "gender": student.gender,
-        "phone": student.phone,
-        "weixin": student.weixin,
-        "cooperateTime": student.cooperateTime,
-    }
-    return jsonify({
-        "status": 200,
-        "message": "客户信息获取成功",
-        "stuInfo": stuInfo,
-    })
+    session = Session()
+    try:
+        student = session.query(Client).get(stuId)
+        stuInfo = {
+            "id": stuId,
+            "name": student.name,
+            "gender": student.gender,
+            "phone": student.phone,
+            "weixin": student.weixin,
+            "cooperateTime": student.cooperateTime,
+        }
+        return jsonify({
+            "status": 200,
+            "message": "客户信息获取成功",
+            "stuInfo": stuInfo,
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+        })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/updateClient")
@@ -413,6 +467,7 @@ async def updateClient(request):
         })
     data = request.json()
     client_id = data.get("id")
+    session = Session()
     try:
         client = session.query(Client).filter(Client.id == client_id).first()
         if not client:
@@ -493,6 +548,8 @@ async def updateClient(request):
             "status": -3,
             "message": f"更新失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/addClientNote")
@@ -514,6 +571,7 @@ async def addClientNote(request):
     client_id = data.get("studentId")  # 从请求中获取客户ID
     note = data.get("note")  # 获取备注内容
 
+    session = Session()
     try:
         client = session.query(Client).filter(Client.id == client_id).first()
         if not client:
@@ -547,6 +605,8 @@ async def addClientNote(request):
             "status": -3,
             "message": f"添加备注失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/addClient")
@@ -572,6 +632,7 @@ async def addClient(request):
                 "status": 400,
                 "message": f"缺少必填字段：{field}"
             })
+    session = Session()
     try:
         uniqueFields = {
             "phone": "电话",
@@ -614,6 +675,8 @@ async def addClient(request):
             "status": 500,
             "message": f"添加失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/deleteClient")
@@ -637,6 +700,7 @@ async def deleteClient(request):
             "status": 400,
             "message": "缺少客户ID"
         })
+    session = Session()
     try:
         his_logs = session.query(ClientLog).filter(ClientLog.clientId == client_id).all()
         for log in his_logs:
@@ -666,6 +730,8 @@ async def deleteClient(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/unassignClients")
@@ -691,6 +757,7 @@ async def unassignClients(request):
             "message": "缺少客户ID"
         })
 
+    session = Session()
     try:
         # 批量更新客户的所属人为空
         session.query(Client).filter(Client.id.in_(client_ids)).update(
@@ -719,6 +786,8 @@ async def unassignClients(request):
             "status": 500,
             "message": f"取消分配失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/assignClients")
@@ -746,6 +815,7 @@ async def assignClients(request):
             "message": "参数错误"
         })
 
+    session = Session()
     try:
         # 获取被分配的用户信息
         assigned_user = session.query(User).get(assigned_user_id)
@@ -778,6 +848,8 @@ async def assignClients(request):
             "status": 500,
             "message": f"分配失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 转客户
@@ -798,6 +870,7 @@ async def convertToClients(request):
     data = request.json()
     ids = data.get("ids")
     ids = json.loads(ids)
+    session = Session()
     try:
         # 批量更新客户状态
         clients = session.query(Client).filter(Client.id.in_(ids)).all()
@@ -821,6 +894,8 @@ async def convertToClients(request):
             "status": 500,
             "message": f"转换失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/submitReserve")
@@ -837,6 +912,7 @@ async def submitReserve(request):
             "status": -2,
             "message": "无权限进行该操作"
         })
+    session = Session()
     data = request.json()
     clientId = data.get("clientId")
     client = session.query(Client).get(clientId)
@@ -860,6 +936,7 @@ async def submitReserve(request):
     if nextTalkDate:
         nextTalkDate = parser.parse(nextTalkDate)
     info = data.get("info")
+    session = Session()
     try:
         # 允许重复预约
         # if client.clientStatus == 4:
@@ -890,6 +967,8 @@ async def submitReserve(request):
             "status": 500,
             "message": f"预约失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/cancelReserve")
@@ -906,6 +985,7 @@ async def cancelReserve(request):
             "status": -2,
             "message": "无权限进行该操作"
         })
+    session = Session()
     data = request.json()
     clientId = data.get("clientId")
     client = session.query(Client).get(clientId)
@@ -940,6 +1020,8 @@ async def cancelReserve(request):
             "status": 500,
             "message": f"取消预约失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 学员毕业
@@ -960,6 +1042,7 @@ async def graduateClient(request):
     data = request.json()
     clientId = data.get("id")
 
+    session = Session()
     try:
         client = session.query(Client).get(clientId)
         if not client:
@@ -995,6 +1078,8 @@ async def graduateClient(request):
             "status": 500,
             "message": f"操作失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 取消毕业
@@ -1015,6 +1100,7 @@ async def cancelGraduate(request):
     data = request.json()
     clientId = data.get("id")
 
+    session = Session()
     try:
         client = session.query(Client).get(clientId)
         if not client:
@@ -1050,6 +1136,8 @@ async def cancelGraduate(request):
             "status": 500,
             "message": f"操作失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 批量导入线索
@@ -1077,6 +1165,7 @@ async def batchImportClues(request):
             "message": "无效的导入数据"
         })
 
+    session = Session()
     try:
         success_count = 0
         error_count = 0
@@ -1161,6 +1250,8 @@ async def batchImportClues(request):
             "status": 500,
             "message": f"导入失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 客户付款
@@ -1179,6 +1270,7 @@ async def submitPayment(request):
             "message": "无权限进行该操作"
         })
     data = request.json()
+    session = Session()
     try:
         amount = int(data.get("amount"))
         # 创建支付记录
@@ -1220,6 +1312,8 @@ async def submitPayment(request):
             "status": 500,
             "message": f"付款失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 获取客户付款记录
@@ -1242,6 +1336,7 @@ async def getClientPayments(request):
             "message": "缺少客户ID"
         })
 
+    session = Session()
     try:
         # 获取该客户的所有交易记录
         payments = session.query(Payment).filter(
@@ -1256,6 +1351,8 @@ async def getClientPayments(request):
             "status": 500,
             "message": f"获取交易记录失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/getPayments")
@@ -1273,6 +1370,7 @@ async def getPayments(request):
     page_size = data.get("pageSize", 10)
     paymentType = data.get("paymentType", "all")
 
+    session = Session()
     try:
         query = session.query(Payment)
 
@@ -1348,6 +1446,8 @@ async def getPayments(request):
             "status": 500,
             "message": f"获取交易记录失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/addPayment")
@@ -1371,6 +1471,7 @@ async def addPayment(request):
             "status": -2,
             "message": "金额不能等于0"
         })
+    session = Session()
     try:
         payment = Payment()
         payment.clientId = data.get("clientId") if data.get("clientId") != "null" else None
@@ -1395,6 +1496,8 @@ async def addPayment(request):
             "status": 500,
             "message": f"添加失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/updatePayment")
@@ -1424,6 +1527,7 @@ async def updatePayment(request):
             "status": -2,
             "message": "金额不能为0"
         })
+    session = Session()
     try:
         payment = session.query(Payment).filter(Payment.id == payment_id).first()
         if not payment:
@@ -1451,6 +1555,8 @@ async def updatePayment(request):
             "status": 500,
             "message": f"更新失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/deletePayment")
@@ -1475,6 +1581,7 @@ async def deletePayment(request):
             "message": "缺少ID"
         })
 
+    session = Session()
     try:
         payment = session.query(Payment).filter(Payment.id == payment_id).first()
         if not payment:
@@ -1495,6 +1602,8 @@ async def deletePayment(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/getLogs")
@@ -1511,34 +1620,42 @@ async def getLogs(request):
     page_index = data.get("pageIndex", 1)
     page_size = data.get("pageSize", 10)
     offset = (int(page_index) - 1) * int(page_size)
+    session = Session()
+    try:
+        # 构建查询
+        query = session.query(Log).order_by(Log.time.desc())
 
-    # 构建查询
-    query = session.query(Log).order_by(Log.time.desc())
+        # 添加筛选条件
+        if data.get("operatorName"):
+            query = query.join(User, Log.operatorId == User.id) \
+                .filter(User.username.like(f"%{data['operatorName']}%"))
+        if data.get("operation"):
+            query = query.filter(Log.operation.like(f"%{data['operation']}%"))
+        if data.get("startTime"):
+            query = query.filter(Log.time >= data["startTime"])
+        if data.get("endTime"):
+            query = query.filter(Log.time <= data["endTime"])
 
-    # 添加筛选条件
-    if data.get("operatorName"):
-        query = query.join(User, Log.operatorId == User.id) \
-            .filter(User.username.like(f"%{data['operatorName']}%"))
-    if data.get("operation"):
-        query = query.filter(Log.operation.like(f"%{data['operation']}%"))
-    if data.get("startTime"):
-        query = query.filter(Log.time >= data["startTime"])
-    if data.get("endTime"):
-        query = query.filter(Log.time <= data["endTime"])
+        # 获取分页数据
+        logs = query.offset(offset).limit(page_size).all()
+        logs = [log.to_json() for log in logs]
 
-    # 获取分页数据
-    logs = query.offset(offset).limit(page_size).all()
-    logs = [log.to_json() for log in logs]
+        # 获取总数
+        total = query.count()
 
-    # 获取总数
-    total = query.count()
-
-    return jsonify({
-        "status": 200,
-        "message": "获取日志成功",
-        "logs": logs,
-        "total": total
-    })
+        return jsonify({
+            "status": 200,
+            "message": "获取日志成功",
+            "logs": logs,
+            "total": total
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+        })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/getClientLogs")
@@ -1556,6 +1673,7 @@ async def getClientLogs(request):
     page_index = data.get("pageIndex", 1)
     page_size = data.get("pageSize", 10)
     offset = (int(page_index) - 1) * int(page_size)
+    session = Session()
     try:
         # 构建查询
         query = session.query(ClientLog).filter(ClientLog.clientId == clientId).order_by(ClientLog.time.desc())
@@ -1578,6 +1696,8 @@ async def getClientLogs(request):
             "status": 500,
             "message": "日志获取失败"
         })
+    finally:
+        session.close()
 
 
 # 确认成单
@@ -1598,6 +1718,7 @@ async def confirmCooperation(request):
     data = request.json()
     clientId = data.get("clientId")
 
+    session = Session()
     try:
         client = session.query(Client).get(clientId)
         if not client:
@@ -1633,6 +1754,8 @@ async def confirmCooperation(request):
             "status": 500,
             "message": f"成单失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @extraRouter.post("/cancelCooperation")
@@ -1652,6 +1775,7 @@ async def cancelCooperation(request):
     data = request.json()
     clientId = data.get("clientId")
 
+    session = Session()
     try:
         client = session.query(Client).get(clientId)
         if not client:
@@ -1689,6 +1813,8 @@ async def cancelCooperation(request):
             "status": 500,
             "message": f"取消成单失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 上传合同
@@ -1707,66 +1833,74 @@ async def uploadContract(request):
             "status": -2,
             "message": "无权限进行该操作"
         })
-    # try:
-    # 获取上传的文件和客户ID
-    # 字典{ 文件1名: 文件1 }
-    files: dict = request.files
-    if not files:
+    session = Session()
+    try:
+        # 获取上传的文件和客户ID
+        # 字典{ 文件1名: 文件1 }
+        files: dict = request.files
+        if not files:
+            return jsonify({
+                "status": 400,
+                "message": "未上传文件"
+            })
+        fileName, fileData = next(iter(files.items()))
+        clientId = request.form_data.get('clientId')
+
+        if not files:
+            return jsonify({
+                "status": 400,
+                "message": "未上传文件"
+            })
+        if not clientId:
+            return jsonify({
+                "status": 400,
+                "message": "未提供客户ID"
+            })
+
+        # 获取客户信息
+        client = session.query(Client).get(clientId)
+        if not client:
+            return jsonify({
+                "status": 400,
+                "message": "客户不存在"
+            })
+
+        # 暂存文件
+        # file_path = os.path.join("./temp", fileName)
+        # with open(file_path, "wb") as f:
+        #     f.write(fileData)
+
+        # 上传到阿里云OSS
+        oss_path = f'contracts/{fileName}'
+        bucket.put_object(oss_path, fileData)
+        # 获取文件URL
+        file_url = f'https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/{oss_path}'
+        # 更新客户合同信息
+        client.contractUrl = file_url
+
+        # # 记录操作日志
+        # log = Log(operatorId=userId, operation=f"客户：{client.name}上传合同文件：{filename}")
+        # session.add(log)
+        # logContent = f"上传合同文件：{filename}"
+        # clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
+        # session.add(clientLog)
+        session.commit()
         return jsonify({
-            "status": 400,
-            "message": "未上传文件"
+            "status": 200,
+            "message": "合同上传成功",
         })
-    fileName, fileData = next(iter(files.items()))
-    clientId = request.form_data.get('clientId')
 
-    if not files:
+        # except Exception as e:
+        #     print(e)
+        #     session.rollback()
+        #     return jsonify({
+        #         "status": 500,
+        #         "message": f"合同上传失败：{str(e)}"
+        #     })
+    except Exception as e:
+        session.rollback()
         return jsonify({
-            "status": 400,
-            "message": "未上传文件"
+            "status": 500,
         })
-    if not clientId:
-        return jsonify({
-            "status": 400,
-            "message": "未提供客户ID"
-        })
-
-    # 获取客户信息
-    client = session.query(Client).get(clientId)
-    if not client:
-        return jsonify({
-            "status": 400,
-            "message": "客户不存在"
-        })
-
-    # 暂存文件
-    # file_path = os.path.join("./temp", fileName)
-    # with open(file_path, "wb") as f:
-    #     f.write(fileData)
-
-    # 上传到阿里云OSS
-    oss_path = f'contracts/{fileName}'
-    bucket.put_object(oss_path, fileData)
-    # 获取文件URL
-    file_url = f'https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/{oss_path}'
-    # 更新客户合同信息
-    client.contractUrl = file_url
-
-    # # 记录操作日志
-    # log = Log(operatorId=userId, operation=f"客户：{client.name}上传合同文件：{filename}")
-    # session.add(log)
-    # logContent = f"上传合同文件：{filename}"
-    # clientLog = ClientLog(clientId=client.id, operatorId=userId, operation=logContent)
-    # session.add(clientLog)
-    session.commit()
-    return jsonify({
-        "status": 200,
-        "message": "合同上传成功",
-    })
-
-    # except Exception as e:
-    #     print(e)
-    #     session.rollback()
-    #     return jsonify({
-    #         "status": 500,
-    #         "message": f"合同上传失败：{str(e)}"
-    #     })
+    finally:
+        session.close()

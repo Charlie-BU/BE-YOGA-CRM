@@ -15,18 +15,27 @@ async def getAllDepts(request):
             "status": -1,
             "message": "用户未登录"
         })
-    data = request.json()
-    schoolId = data.get("schoolId")
-    if schoolId:
-        depts = session.query(Department).filter(Department.schoolId == schoolId).all()
-    else:
-        depts = session.query(Department).all()
-    depts = [Department.to_json(dept) for dept in depts]
-    return jsonify({
-        "status": 200,
-        "message": "全部部门获取成功",
-        "depts": depts,
-    })
+    session = Session()
+    try:
+        data = request.json()
+        schoolId = data.get("schoolId")
+        if schoolId:
+            depts = session.query(Department).filter(Department.schoolId == schoolId).all()
+        else:
+            depts = session.query(Department).all()
+        depts = [Department.to_json(dept) for dept in depts]
+        return jsonify({
+            "status": 200,
+            "message": "全部部门获取成功",
+            "depts": depts,
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+        })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/getDeptUsers")
@@ -41,6 +50,7 @@ async def getDeptUsers(request):
 
     data = request.json()
     branch_id = data.get("branchId")
+    session = Session()
     try:
         users = session.query(User).filter(User.departmentId == branch_id).all()
         return jsonify({
@@ -52,6 +62,8 @@ async def getDeptUsers(request):
             "status": 500,
             "message": f"获取用户列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/getAllSchools")
@@ -63,18 +75,27 @@ async def getAllSchools(request):
             "status": -1,
             "message": "用户未登录"
         })
-    data = request.json()
-    schools = session.query(School).all()
-    withNet = data.get("withNet", False)
-    if withNet:
-        schools = [School.to_json(school) for school in schools]
-    else:
-        schools = [School.to_json(school) for school in schools if school.name != "网络部"]
-    return jsonify({
-        "status": 200,
-        "message": "全部校区获取成功",
-        "schools": schools,
-    })
+    session = Session()
+    try:
+        data = request.json()
+        schools = session.query(School).all()
+        withNet = data.get("withNet", False)
+        if withNet:
+            schools = [School.to_json(school) for school in schools]
+        else:
+            schools = [School.to_json(school) for school in schools if school.name != "网络部"]
+        return jsonify({
+            "status": 200,
+            "message": "全部校区获取成功",
+            "schools": schools,
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+        })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/getSchoolUsers")
@@ -88,6 +109,7 @@ async def getSchoolUsers(request):
         })
     data = request.json()
     schoolId = data.get("schoolId")
+    session = Session()
     try:
         users = session.query(User).filter(User.schoolId == schoolId).all()
         return jsonify({
@@ -99,6 +121,8 @@ async def getSchoolUsers(request):
             "status": 500,
             "message": f"获取用户列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/getSchoolCourses")
@@ -114,6 +138,7 @@ async def getSchoolCourses(request):
     data = request.json()
     schoolId = data.get("schoolId")
 
+    session = Session()
     try:
         courses = session.query(Course).filter(Course.schoolId == schoolId).all()
         return jsonify({
@@ -125,6 +150,8 @@ async def getSchoolCourses(request):
             "status": 500,
             "message": f"获取课程列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/addDept")
@@ -152,6 +179,7 @@ async def addDept(request):
             "message": "部门名称和所属校区不能为空"
         })
 
+    session = Session()
     try:
         # 检查校区是否存在
         school = session.query(School).filter(School.id == schoolId).first()
@@ -188,6 +216,8 @@ async def addDept(request):
             "status": 500,
             "message": f"添加失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/updateDept")
@@ -216,6 +246,7 @@ async def updateDept(request):
             "message": "参数错误"
         })
 
+    session = Session()
     try:
         # 检查部门是否存在
         dept = session.query(Department).filter(Department.id == dept_id).first()
@@ -260,6 +291,8 @@ async def updateDept(request):
             "status": 500,
             "message": f"更新失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/deleteDept")
@@ -285,6 +318,7 @@ async def deleteDept(request):
             "message": "参数错误"
         })
 
+    session = Session()
     try:
         # 检查部门是否存在
         dept = session.query(Department).filter(Department.id == dept_id).first()
@@ -316,6 +350,8 @@ async def deleteDept(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/addSchool")
@@ -343,6 +379,7 @@ async def addSchool(request):
             "message": "校区名称和地址不能为空"
         })
 
+    session = Session()
     try:
         # 检查校区名称是否已存在
         existing = session.query(School).filter(School.name == name).first()
@@ -371,6 +408,8 @@ async def addSchool(request):
             "status": 500,
             "message": f"添加失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/updateSchool")
@@ -399,6 +438,7 @@ async def updateSchool(request):
             "message": "参数错误"
         })
 
+    session = Session()
     try:
         # 检查校区是否存在
         school = session.query(School).filter(School.id == schoolId).first()
@@ -435,6 +475,8 @@ async def updateSchool(request):
             "status": 500,
             "message": f"更新失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/deleteSchool")
@@ -460,6 +502,7 @@ async def deleteSchool(request):
             "message": "参数错误"
         })
 
+    session = Session()
     try:
         # 检查校区是否存在
         school = session.query(School).filter(School.id == schoolId).first()
@@ -491,6 +534,8 @@ async def deleteSchool(request):
             "status": 500,
             "message": f"删除失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @deptRouter.post("/calcSchoolBudget")
@@ -508,6 +553,7 @@ async def calcSchoolBudget(request):
     startDate = data.get("startDate")
     endDate = data.get("endDate")
 
+    session = Session()
     try:
         # 获取学校信息
         school = session.query(School).filter(School.id == schoolId).first()
@@ -546,3 +592,5 @@ async def calcSchoolBudget(request):
             "status": 500,
             "message": f"计算失败：{e}"
         })
+    finally:
+        session.close()

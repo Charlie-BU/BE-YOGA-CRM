@@ -23,6 +23,7 @@ async def loginCheck(request):
             "status": -2,
             "message": "登录已过期，请重新登录"
         })
+    session = Session()
     try:
         user = session.query(User).get(userId)
         return jsonify({
@@ -41,12 +42,15 @@ async def loginCheck(request):
             "status": 500,
             "message": "错误"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/login")
 async def login(request):
     data = request.json()
     username = data["username"]
+    session = Session()
     try:
         user = session.query(User).filter(User.username == username).first()
         if not user:
@@ -83,12 +87,15 @@ async def login(request):
             "status": 500,
             "message": "错误"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getUserInfo")
 async def getUserInfo(request):
     sessionid = request.headers["sessionid"]
     userId = checkSessionid(sessionid).get("userId")
+    session = Session()
     try:
         user = session.query(User).get(userId)
         return jsonify({
@@ -102,6 +109,8 @@ async def getUserInfo(request):
             "status": 500,
             "message": "错误"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/register")
@@ -118,26 +127,28 @@ async def register(request):
             "status": -2,
             "message": "无权限进行该操作"
         })
-    form = request.json()["form"]
-    form = json.loads(form)
-    username = form["username"]
-    gender = form["gender"]
-    phone = form["phone"]
-    address = form["address"]
-    departmentId = form["department"]
-    schoolId = None
-    if departmentId:
-        department = session.query(Department).get(departmentId)
-        schoolId = department.schoolId
-    vocationId = form["vocationId"]
-    status = form["status"]
-    password = form["password"]
-    user = User(username=username, gender=gender, phone=phone, address=address, departmentId=departmentId,
-                schoolId=schoolId,
-                vocationId=vocationId, status=status, usertype=1, clientVisible=1,
-                hashedPassword=User.hashPassword(password))
-    log = Log(operatorId=userId, operation=f"添加用户：{username}")
+    session = Session()
     try:
+        form = request.json()["form"]
+        form = json.loads(form)
+        username = form["username"]
+        gender = form["gender"]
+        phone = form["phone"]
+        address = form["address"]
+        departmentId = form["department"]
+        schoolId = None
+        if departmentId:
+            department = session.query(Department).get(departmentId)
+            schoolId = department.schoolId
+        vocationId = form["vocationId"]
+        status = form["status"]
+        password = form["password"]
+        user = User(username=username, gender=gender, phone=phone, address=address, departmentId=departmentId,
+                    schoolId=schoolId,
+                    vocationId=vocationId, status=status, usertype=1, clientVisible=1,
+                    hashedPassword=User.hashPassword(password))
+        log = Log(operatorId=userId, operation=f"添加用户：{username}")
+
         session.add(user)
         session.add(log)
         session.commit()
@@ -151,12 +162,15 @@ async def register(request):
             "status": 500,
             "message": "错误"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/modifyPwd")
 async def modifyPwd(request):
     sessionid = request.headers["sessionid"]
     userId = checkSessionid(sessionid).get("userId")
+    session = Session()
     try:
         user = session.query(User).get(userId)
         if not user:
@@ -187,6 +201,8 @@ async def modifyPwd(request):
             "status": 500,
             "message": "错误"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getAllUsers")
@@ -205,6 +221,7 @@ async def getAllUsers(request):
     name = data.get("name", "")
     schoolId = data.get("schoolId")
     deptId = data.get("deptId")
+    session = Session()
     try:
         # 获取分页数据
         query = session.query(User)
@@ -225,10 +242,13 @@ async def getAllUsers(request):
             "total": total
         })
     except Exception as e:
+        session.rollback()
         return jsonify({
             "status": 500,
             "message": f"获取用户列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/updateUser")
@@ -248,6 +268,7 @@ async def updateUser(request):
     data = request.json()
     user_id = data.get("id")
 
+    session = Session()
     try:
         # 查找要更新的用户
         user = session.query(User).get(user_id)
@@ -286,6 +307,8 @@ async def updateUser(request):
             "status": -4,
             "message": f"更新失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 删除用户
@@ -306,6 +329,7 @@ async def deleteUser(request):
     data = request.json()
     user_id = data.get("id")
 
+    session = Session()
     try:
         # 查找要删除的用户
         user = session.query(User).filter(User.id == user_id).first()
@@ -348,6 +372,8 @@ async def deleteUser(request):
             "status": -5,
             "message": f"删除失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/initUserPwd")
@@ -373,6 +399,7 @@ async def initUserPwd(request):
             "message": "缺少用户ID"
         })
 
+    session = Session()
     try:
         # 获取用户信息
         user = session.query(User).filter(User.id == user_id).first()
@@ -395,6 +422,8 @@ async def initUserPwd(request):
             "status": 500,
             "message": f"密码初始化失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getCustomerServiceSummaryData")
@@ -411,6 +440,7 @@ async def getCustomerServiceSummaryData(request):
     startDate = data.get("startDate")
     endDate = data.get("endDate")
 
+    session = Session()
     try:
         users = session.query(User).order_by(User.schoolId).all()
         allData = []
@@ -507,6 +537,8 @@ async def getCustomerServiceSummaryData(request):
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # @userRouter.post("/getCustomerServiceSummaryData")
@@ -635,6 +667,7 @@ async def getDateSummaryDataPerDay(request):
 
     data = request.json()
     date = data.get("date")
+    session = Session()
     try:
         # 获取当天的数据
         day_start = f"{date} 00:00:00"
@@ -729,6 +762,8 @@ async def getDateSummaryDataPerDay(request):
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getCustomerServiceLeadsData")
@@ -746,6 +781,7 @@ async def getCustomerServiceLeadsData(request):
     startDate = data.get("startDate")
     endDate = data.get("endDate")
 
+    session = Session()
     try:
         user_query = session.query(User)
         if schoolId:
@@ -824,6 +860,8 @@ async def getCustomerServiceLeadsData(request):
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getCustomerServiceConversionData")
@@ -841,6 +879,7 @@ async def getCustomerServiceConversionData(request):
     startDate = data.get("startDate")
     endDate = data.get("endDate")
 
+    session = Session()
     try:
         user_query = session.query(User)
         if schoolId:
@@ -920,6 +959,8 @@ async def getCustomerServiceConversionData(request):
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getCustomerServiceDailyData")
@@ -937,6 +978,7 @@ async def getCustomerServiceDailyData(request):
     startDate = data.get("startDate")
     endDate = data.get("endDate")
 
+    session = Session()
     try:
         user_query = session.query(User)
         if schoolId:
@@ -1016,6 +1058,8 @@ async def getCustomerServiceDailyData(request):
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getStuffPerformanceByClient")
@@ -1033,6 +1077,7 @@ async def getStuffPerformanceByClient(request):
     startDate = data.get("startDate")
     endDate = data.get("endDate")
 
+    session = Session()
     try:
         allData = []
         # 成单客户
@@ -1090,6 +1135,8 @@ async def getStuffPerformanceByClient(request):
             "status": 500,
             "message": f"获取数据失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getAllVocations")
@@ -1101,13 +1148,23 @@ async def getAllVocations(request):
             "status": -1,
             "message": "用户未登录"
         })
-    vocations = session.query(Role).all()
-    vocations = [vocation.to_json() for vocation in vocations]
-    return jsonify({
-        "status": 200,
-        "message": "全部职位获取成功",
-        "vocations": vocations,
-    })
+    session = Session()
+    try:
+        vocations = session.query(Role).all()
+        vocations = [vocation.to_json() for vocation in vocations]
+        return jsonify({
+            "status": 200,
+            "message": "全部职位获取成功",
+            "vocations": vocations,
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "失败"
+        })
+    finally:
+        session.close()
 
 
 @userRouter.post("/getAllAuthorities")
@@ -1119,13 +1176,23 @@ async def getAllAuthorities(request):
             "status": -1,
             "message": "用户未登录"
         })
-    authorities = session.query(Authority).order_by(Authority.module).all()
-    authorities = [authority.to_json() for authority in authorities]
-    return jsonify({
-        "status": 200,
-        "message": "全部权限获取成功",
-        "authorities": authorities,
-    })
+    session = Session()
+    try:
+        authorities = session.query(Authority).order_by(Authority.module).all()
+        authorities = [authority.to_json() for authority in authorities]
+        return jsonify({
+            "status": 200,
+            "message": "全部权限获取成功",
+            "authorities": authorities,
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({
+            "status": 500,
+            "message": "失败"
+        })
+    finally:
+        session.close()
 
 
 # 修改职位权限：限定admin
@@ -1146,6 +1213,7 @@ async def updateVocationAuthority(request):
     data = request.json()
     vocationId = data["vocationId"]
     authorities = data["authorities"]
+    session = Session()
     try:
         authorities = json.loads(authorities)
         vocation = session.query(Role).get(vocationId)
@@ -1161,6 +1229,8 @@ async def updateVocationAuthority(request):
             "status": 500,
             "messgae": "职位权限修改失败",
         })
+    finally:
+        session.close()
 
 
 @userRouter.post("/addVocation")
@@ -1179,6 +1249,7 @@ async def addVocation(request):
         })
     data = request.json()
     name = data.get("name")
+    session = Session()
     try:
         vocation = Role(name=name)
         session.add(vocation)
@@ -1194,3 +1265,5 @@ async def addVocation(request):
             "status": 500,
             "message": f"密码初始化失败：{str(e)}"
         })
+    finally:
+        session.close()

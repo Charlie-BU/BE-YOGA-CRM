@@ -1,12 +1,9 @@
-from datetime import timedelta
-
 from dateutil import parser
 from robyn import SubRouter, jsonify
-from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload
 
 from models import *
-from utils.hooks import calcSignature, encode, checkSessionid, checkUserAuthority
+from utils.hooks import checkSessionid, checkUserAuthority
 
 dormRouter = SubRouter(__file__, prefix="/dorm")
 
@@ -25,6 +22,7 @@ async def getDormInfoByBedId(request):
     data = request.json()
     bed_id = data.get("bedId")
 
+    session = Session()
     try:
         # 获取床位信息，包括关联的房间和公寓信息
         bed = session.query(Bed).get(bed_id)
@@ -54,6 +52,8 @@ async def getDormInfoByBedId(request):
             "status": 500,
             "message": f"获取住宿信息失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/getDormitories")
@@ -70,7 +70,7 @@ async def getDormitories(request):
     pageIndex = data.get("pageIndex", 1)
     pageSize = data.get("pageSize", 10)
     schoolId = data.get("schoolId")
-
+    session = Session()
     try:
         # 构建查询
         if schoolId:
@@ -101,6 +101,8 @@ async def getDormitories(request):
             "status": 500,
             "message": f"获取公寓列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/addDormitory")
@@ -121,7 +123,7 @@ async def addDormitory(request):
     name = data.get("name")
     category = data.get("category")
     schoolId = data.get("schoolId")
-
+    session = Session()
     try:
         # 创建新公寓
         new_dormitory = Dormitory(
@@ -143,6 +145,8 @@ async def addDormitory(request):
             "status": 500,
             "message": f"添加公寓失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/updateDormitory")
@@ -164,7 +168,7 @@ async def updateDormitory(request):
     name = data.get("name")
     category = data.get("category")
     schoolId = data.get("schoolId")
-
+    session = Session()
     try:
         dormitory = session.query(Dormitory).filter(Dormitory.id == dormitory_id).first()
         if not dormitory:
@@ -189,6 +193,8 @@ async def updateDormitory(request):
             "status": 500,
             "message": f"更新公寓失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/deleteDormitory")
@@ -207,7 +213,7 @@ async def deleteDormitory(request):
         })
     data = request.json()
     dormitory_id = data.get("id")
-
+    session = Session()
     try:
         # 查找关联的房间
         rooms = session.query(Room).filter(Room.dormitoryId == dormitory_id).all()
@@ -233,6 +239,8 @@ async def deleteDormitory(request):
             "status": 500,
             "message": f"删除公寓失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 房间相关
@@ -248,7 +256,7 @@ async def getRooms(request):
 
     data = request.json()
     dormitoryId = data.get("dormitoryId")
-
+    session = Session()
     try:
         # 获取指定公寓的所有房间
         rooms = session.query(Room).filter(Room.dormitoryId == dormitoryId).all()
@@ -262,6 +270,8 @@ async def getRooms(request):
             "status": 500,
             "message": f"获取房间列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/addRoom")
@@ -283,7 +293,7 @@ async def addRoom(request):
     roomNumber = data.get("roomNumber")
     building = data.get("building")
     maxBeds = data.get("maxBeds", 0)
-
+    session = Session()
     try:
         # 创建新房间
         new_room = Room(
@@ -306,6 +316,8 @@ async def addRoom(request):
             "status": 500,
             "message": f"添加房间失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/updateRoom")
@@ -327,7 +339,7 @@ async def updateRoom(request):
     roomNumber = data.get("roomNumber")
     building = data.get("building")
     maxBeds = data.get("maxBeds")
-
+    session = Session()
     try:
         room = session.query(Room).filter(Room.id == room_id).first()
         if not room:
@@ -352,6 +364,8 @@ async def updateRoom(request):
             "status": 500,
             "message": f"更新房间失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/deleteRoom")
@@ -370,7 +384,7 @@ async def deleteRoom(request):
         })
     data = request.json()
     room_id = data.get("id")
-
+    session = Session()
     try:
         # 删除关联的床位
         session.query(Bed).filter(Bed.roomId == room_id).delete()
@@ -389,6 +403,8 @@ async def deleteRoom(request):
             "status": 500,
             "message": f"当前房间存在床位有人入住，无法删除"
         })
+    finally:
+        session.close()
 
 
 # 床位相关
@@ -404,7 +420,7 @@ async def getBeds(request):
 
     data = request.json()
     roomId = data.get("roomId")
-
+    session = Session()
     try:
         # 获取指定房间的所有床位
         beds = session.query(Bed).filter(Bed.roomId == roomId).all()
@@ -418,6 +434,8 @@ async def getBeds(request):
             "status": 500,
             "message": f"获取床位列表失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/addBed")
@@ -438,7 +456,7 @@ async def addBed(request):
     roomId = data.get("roomId")
     bedNumber = data.get("bedNumber")
     category = data.get("category")
-
+    session = Session()
     try:
         room = session.query(Room).get(roomId)
         if not room:
@@ -471,6 +489,8 @@ async def addBed(request):
             "status": 500,
             "message": f"添加床位失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/updateBed")
@@ -491,7 +511,7 @@ async def updateBed(request):
     bed_id = data.get("id")
     bedNumber = data.get("bedNumber")
     category = data.get("category")
-
+    session = Session()
     try:
         bed = session.query(Bed).filter(Bed.id == bed_id).first()
         if not bed:
@@ -515,6 +535,8 @@ async def updateBed(request):
             "status": 500,
             "message": f"更新床位失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/deleteBed")
@@ -533,7 +555,7 @@ async def deleteBed(request):
         })
     data = request.json()
     bed_id = data.get("id")
-
+    session = Session()
     try:
         bed = session.query(Bed).get(bed_id)
         if not bed:
@@ -562,6 +584,8 @@ async def deleteBed(request):
             "status": 500,
             "message": f"删除床位失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 # 获取未入住的成单客户
@@ -579,6 +603,7 @@ async def getUncheckedDealedClients(request):
     page_size = data.get("pageSize", 10)  # 每页数量，默认10条
     offset = (int(page_index) - 1) * int(page_size)
     name = data.get("name", "")
+    session = Session()
     try:
         # 获取分页数据
         query = session.query(Client).filter(
@@ -611,6 +636,8 @@ async def getUncheckedDealedClients(request):
             "status": 500,
             "message": "错误"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/assignBed")
@@ -632,7 +659,7 @@ async def assignBed(request):
     student_id = data.get("studentId")
     checkOutDate = data.get("checkOutDate")
     daysDuration = (parser.parse(checkOutDate).date() - datetime.now().date()).days
-
+    session = Session()
     try:
         bed = session.query(Bed).filter(Bed.id == bed_id).first()
         if not bed or not student_id:
@@ -670,6 +697,8 @@ async def assignBed(request):
             "status": 500,
             "message": f"床位分配失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/checkOut")
@@ -688,7 +717,7 @@ async def checkOut(request):
         })
     data = request.json()
     bed_id = data.get("bedId")
-
+    session = Session()
     try:
         # 获取床位信息
         bed = session.query(Bed).filter(Bed.id == bed_id).first()
@@ -732,6 +761,8 @@ async def checkOut(request):
             "status": 500,
             "message": f"离住失败：{str(e)}"
         })
+    finally:
+        session.close()
 
 
 @dormRouter.post("/getOverdueBeds")
@@ -744,6 +775,7 @@ async def getOverdueBeds(request):
             "status": -1,
             "message": "用户未登录"
         })
+    session = Session()
     try:
         today = datetime.now().date()
         # 预加载 clients，防止 lazy load
@@ -785,3 +817,5 @@ async def getOverdueBeds(request):
             "status": 500,
             "message": f"获取失败：{str(e)}"
         })
+    finally:
+        session.close()

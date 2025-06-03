@@ -8,7 +8,7 @@ import yagmail
 import random
 
 from config import LOGIN_SECRET, MAX_LOG_LENGTH
-from models import session, User, Log
+from models import User, Log, Session
 
 
 # from models import *
@@ -68,41 +68,53 @@ def checkSessionid(sessionid):
 
 
 def checkAdminOnly(userId, operationLevel="adminOnly"):
-    user = session.query(User).get(userId)
-    if not user:
-        return False
-    usertype = user.usertype
-    if operationLevel == "adminOnly":
-        return usertype == 2 or usertype == 6
-    elif operationLevel == "superAdminOnly":
-        return usertype == 6
-    else:
-        return True
+    session = Session()
+    try:
+        user = session.query(User).get(userId)
+        if not user:
+            return False
+        usertype = user.usertype
+        if operationLevel == "adminOnly":
+            return usertype == 2 or usertype == 6
+        elif operationLevel == "superAdminOnly":
+            return usertype == 6
+        else:
+            return True
+    finally:
+        session.close()
 
 
 def checkUserAuthority(userId, authorityId):
-    user = session.query(User).get(userId)
-    if not user:
+    session = Session()
+    try:
+        user = session.query(User).get(userId)
+        if not user:
+            return False
+        # admin豁免
+        if user.usertype >= 2:
+            return True
+        authority = user.authority
+        if authorityId in authority:
+            return True
         return False
-    # admin豁免
-    if user.usertype >= 2:
-        return True
-    authority = user.authority
-    if authorityId in authority:
-        return True
-    return False
+    finally:
+        session.close()
 
 
 def checkUserVisibleClient(userId):
-    user = session.query(User).get(userId)
-    if not user or not user.clientVisible:
-        return [0, None, None]
-    res = [user.clientVisible, user.schoolId, user.departmentId]
-    # admin豁免
-    if user.usertype >= 2:
-        res[0] = 4
+    session = Session()
+    try:
+        user = session.query(User).get(userId)
+        if not user or not user.clientVisible:
+            return [0, None, None]
+        res = [user.clientVisible, user.schoolId, user.departmentId]
+        # admin豁免
+        if user.usertype >= 2:
+            res[0] = 4
+            return res
         return res
-    return res
+    finally:
+        session.close()
 
 
 def generateCaptcha():
@@ -113,14 +125,18 @@ def generateCaptcha():
 
 
 def clearLogs():
-    log_count = session.query(Log).count()
-    if log_count > MAX_LOG_LENGTH:
-        delete_count = log_count - MAX_LOG_LENGTH
-        subquery = (
-            session.query(Log.id)
-            .order_by(Log.time.asc())
-            .limit(delete_count)
-            .subquery()
-        )
-        session.query(Log).filter(Log.id.in_(subquery)).delete(synchronize_session=False)
-        # session.commit()
+    session = Session()
+    try:
+        log_count = session.query(Log).count()
+        if log_count > MAX_LOG_LENGTH:
+            delete_count = log_count - MAX_LOG_LENGTH
+            subquery = (
+                session.query(Log.id)
+                .order_by(Log.time.asc())
+                .limit(delete_count)
+                .subquery()
+            )
+            session.query(Log).filter(Log.id.in_(subquery)).delete(synchronize_session=False)
+            # session.commit()
+    finally:
+        session.close()
