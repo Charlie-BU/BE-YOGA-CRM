@@ -193,7 +193,10 @@ async def updateCourse(request):
         for field in update_fields:
             if field in data:
                 if data[field] == "null" or not data[field]:
-                    continue
+                    if field == "info":
+                        setattr(course, field, "")
+                    else:
+                        continue
                 try:
                     setattr(course, field, data[field])
                 except Exception:
