@@ -22,7 +22,7 @@ async def getCourses(request):
 
     data = request.json()
     pageIndex = data.get("pageIndex", 1)
-    pageSize = data.get("pageSize", 10)
+    pageSize = data.get("pageSize", 10000)
 
     schoolId = data.get("schoolId")
     try:
@@ -868,7 +868,10 @@ async def updateLesson(request):
         for field in update_fields:
             if field in data:
                 if data[field] == "null" or not data[field]:
-                    continue
+                    if field == "info":
+                        setattr(lesson, field, "")
+                    else:
+                        continue
                 try:
                     setattr(lesson, field, data[field])
                 except Exception:
