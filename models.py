@@ -647,9 +647,9 @@ class Room(Base):
     def occupiedBeds(self):
         session = Session()
         beds = session.query(Bed).filter(Bed.roomId == self.id).all()
-        session.close()
         if len(beds) != 0:
             return sum(bool(bed.clients) for bed in beds)
+        session.close()
         return 0
 
     def to_json(self):
@@ -696,11 +696,14 @@ class Bed(Base):
         }
         # if self.roomId:
         #     data["room"] = self.room.to_json()
-        if self.clients:
-            data["studentId"] = self.clients[-1].id
-            data["studentName"] = self.clients[-1].name
-            data["bedCheckInDate"] = self.clients[-1].bedCheckInDate
-            data["bedCheckOutDate"] = self.clients[-1].bedCheckOutDate
+        session = Session()
+        client_for_this_bed = session.query(Client).filter(Client.bedId == self.id).first()
+        if client_for_this_bed:
+            data["studentId"] = client_for_this_bed.id
+            data["studentName"] = client_for_this_bed.name
+            data["bedCheckInDate"] = client_for_this_bed.bedCheckInDate
+            data["bedCheckOutDate"] = client_for_this_bed.bedCheckOutDate
+        session.close()
         return data
 
 
