@@ -6,7 +6,15 @@ from bcrypt import hashpw, gensalt, checkpw
 
 from config import DATABASE_URI
 
-engine = create_engine(DATABASE_URI, echo=True)
+# 配置连接池参数，增加连接池大小和最大溢出数
+engine = create_engine(
+    DATABASE_URI, 
+    echo=True,
+    pool_size=20,  # 默认连接池大小
+    max_overflow=30,  # 最大溢出连接数
+    pool_timeout=60,  # 连接超时时间
+    pool_recycle=3600  # 连接回收时间，防止连接被数据库关闭
+)
 # 数据库表基类
 Base = declarative_base()
 naming_convention = {

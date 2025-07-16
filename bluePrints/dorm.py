@@ -39,7 +39,6 @@ async def getDormInfoByBedId(request):
                 "message": "房间不存在"
             })
         dormitory = session.query(Dormitory).get(room.dormitoryId)
-
         return jsonify({
             "status": 200,
             "dorm": dormitory.to_json(),
@@ -424,9 +423,10 @@ async def getBeds(request):
     try:
         # 获取指定房间的所有床位
         beds = session.query(Bed).filter(Bed.roomId == roomId).all()
+        beds_json = [bed.to_json() for bed in beds]
         return jsonify({
             "status": 200,
-            "beds": [bed.to_json() for bed in beds]
+            "beds": beds_json
         })
     except Exception as e:
         session.rollback()
@@ -463,11 +463,6 @@ async def addBed(request):
             return jsonify({
                 "status": 404,
                 "message": "房间不存在"
-            })
-        if room.beds and len(room.beds) >= room.maxBeds:
-            return jsonify({
-                "status": -2,
-                "message": "当前房间床位数已达最大床位数"
             })
         # 创建新床位
         new_bed = Bed(
