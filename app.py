@@ -1,3 +1,5 @@
+import json
+
 from robyn import Robyn, ALLOW_CORS
 
 from bluePrints.course import courseRouter
@@ -5,6 +7,7 @@ from bluePrints.department import deptRouter
 from bluePrints.dorm import dormRouter
 from bluePrints.extra import extraRouter
 from bluePrints.user import userRouter
+from models import Session, User
 
 app = Robyn(__file__)
 # 生产环境需要注释：使用nginx解决跨域
@@ -173,6 +176,7 @@ async def index():
 # @app.get("/importTeachers")
 # async def importTeachers():
 #     def import_teachers_from_json(file_path):
+#         session = Session()
 #         with open(file_path, 'r', encoding='utf-8') as f:
 #             teachers_data = json.load(f)
 #
