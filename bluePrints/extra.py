@@ -936,7 +936,6 @@ async def submitReserve(request):
     if nextTalkDate:
         nextTalkDate = parser.parse(nextTalkDate)
     info = data.get("info")
-    session = Session()
     try:
         # 允许重复预约
         # if client.clientStatus == 4:
