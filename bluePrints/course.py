@@ -1,5 +1,6 @@
 import json
-from datetime import date
+from datetime import date, datetime
+from dateutil import parser
 from robyn import SubRouter, jsonify
 from sqlalchemy import or_
 
@@ -794,14 +795,18 @@ async def addLesson(request):
                 })
 
         # 创建新班级
+        # 安全处理：如果没有传值就设 None
+        start_date = parser.parse(data['startDate']) if data.get('startDate') else None
+        end_date = parser.parse(data['endDate']) if data.get('endDate') else None
+        
         new_lesson = Lesson(
             name=data['name'],
             courseId=data['courseId'],
             chiefTeacherName=data['chiefTeacherName'],
-            classTeacherId=data.get('classTeacherId') if data.get('classTeacherId') else None,
+            classTeacherId=data.get('classTeacherId') or None,
             teachingAssistantName=data.get('teachingAssistantName'),
-            startDate=data['startDate'],  # 添加开课日期
-            endDate=data.get('endDate'),  # 添加结课日期（可选）
+            startDate=start_date,   # 转换后的日期
+            endDate=end_date,       # 转换后的日期
             info=data.get('info', ''),
             createdTime=datetime.now()  # 添加创建时间
         )
@@ -873,7 +878,12 @@ async def updateLesson(request):
                     else:
                         continue
                 try:
-                    setattr(lesson, field, data[field])
+                    if field in ['startDate', 'endDate']:
+                        # 使用parser.parse处理日期字段
+                        parsed_date = parser.parse(data[field])
+                        setattr(lesson, field, parsed_date)
+                    else:
+                        setattr(lesson, field, data[field])
                 except Exception:
                     continue
         log = Log(
